@@ -339,7 +339,7 @@ export class Inventory {
     // Items (sticks, ingots, tools...) render as flat sprites
     if (id >= 256) {
       const tile = this.atlas.tileCanvas(itemDef(id).icon || 'stone');
-      ctx.drawImage(tile, 0, 0, 16, 16, 0, 0, 32, 32);
+      ctx.drawImage(tile, 0, 0, tile.width, tile.height, 0, 0, 32, 32);
       this._iconCache.set(id, c);
       return c;
     }

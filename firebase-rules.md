@@ -41,15 +41,14 @@ servers/<serverId>/chat/<pushId>     { name, text, ts }
     "servers": {
       ".read": "auth != null",
       "$serverId": {
-        // creating a server: creator must be yourself; only the creator may
-        // change/delete the server's own metadata fields
-        "name":        { ".write": "auth != null && (!data.parent().exists() || data.parent().child('creator').val() === auth.uid)" },
-        "mode":        { ".write": "auth != null && (!data.parent().exists() || data.parent().child('creator').val() === auth.uid)" },
-        "cheats":      { ".write": "auth != null && (!data.parent().exists() || data.parent().child('creator').val() === auth.uid)" },
-        "seed":        { ".write": "auth != null && !data.exists()" },
-        "creator":     { ".write": "auth != null && !data.exists() && newData.val() === auth.uid" },
-        "creatorName": { ".write": "auth != null && !data.exists()" },
-        "created":     { ".write": "auth != null && !data.exists()" },
+        // creating a server writes the whole object at once — allowed only
+        // if the server doesn't exist yet and you list yourself as creator
+        ".write": "auth != null && !data.exists() && newData.child('creator').val() === auth.uid",
+        ".validate": "newData.hasChildren(['name','mode','seed','creator'])",
+        // after creation, only the creator may change server settings
+        "name":   { ".write": "auth != null && data.parent().child('creator').val() === auth.uid" },
+        "mode":   { ".write": "auth != null && data.parent().child('creator').val() === auth.uid" },
+        "cheats": { ".write": "auth != null && data.parent().child('creator').val() === auth.uid" },
 
         "players": {
           // you may only write your own presence entry

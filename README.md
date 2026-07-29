@@ -1,6 +1,6 @@
 # VoxelCraft
 
-A Minecraft-inspired voxel game built with **Three.js and vanilla ES6 modules** — no build step, no game engine, zero image/audio assets (all 16×16 pixel-art textures and every sound effect are generated procedurally at runtime).
+A Minecraft-inspired voxel game built with **Three.js and vanilla ES6 modules** — no build step, no game engine, zero image/audio assets (all 32×32 pixel-art textures and every sound effect are generated procedurally at runtime).
 
 ## Running
 

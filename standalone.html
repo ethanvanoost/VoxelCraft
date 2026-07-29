@@ -887,7 +887,8 @@ function blockDrop(id) {
 
 
 
-const TILE = 16;            // pixels per tile
+const TILE = 16;            // authoring resolution (painters draw at 16×16)
+const OUT = 32;             // final atlas tile resolution (32×32 per block)
 const ATLAS_COLS = 8;       // tiles per atlas row
 
 /** Utility: seeded per-tile RNG so textures are stable across sessions. */
@@ -1306,21 +1307,48 @@ function buildAtlas() {
   const total = names.length + CRACK_STAGES;
   const rows = Math.ceil(total / ATLAS_COLS);
   const canvas = document.createElement('canvas');
-  canvas.width = ATLAS_COLS * TILE;
-  canvas.height = rows * TILE;
+  canvas.width = ATLAS_COLS * OUT;
+  canvas.height = rows * OUT;
   const ctx = canvas.getContext('2d');
+  ctx.imageSmoothingEnabled = false;
+
+  // Painters draw at 16×16 on this scratch canvas; each tile is then blitted
+  // to 32×32 (crisp nearest-neighbor) and refined with a per-pixel grain pass
+  // at full 32× resolution for extra surface detail.
+  const scratch = document.createElement('canvas');
+  scratch.width = TILE; scratch.height = TILE;
+  const sctx = scratch.getContext('2d');
+
+  const blit = (painter, col, row, seed, grain = true) => {
+    sctx.clearRect(0, 0, TILE, TILE);
+    painter(sctx, 0, 0);
+    ctx.clearRect(col * OUT, row * OUT, OUT, OUT);
+    ctx.drawImage(scratch, 0, 0, TILE, TILE, col * OUT, row * OUT, OUT, OUT);
+    if (!grain) return;
+    const img = ctx.getImageData(col * OUT, row * OUT, OUT, OUT);
+    const rand = mulberry32(seed);
+    const d = img.data;
+    for (let i = 0; i < d.length; i += 4) {
+      const v = (rand() - 0.5) * 16;
+      if (d[i + 3] === 0) continue;   // keep transparency (leaves, items)
+      d[i]     = Math.max(0, Math.min(255, d[i] + v));
+      d[i + 1] = Math.max(0, Math.min(255, d[i + 1] + v));
+      d[i + 2] = Math.max(0, Math.min(255, d[i + 2] + v));
+    }
+    ctx.putImageData(img, col * OUT, row * OUT);
+  };
 
   const index = {};
   names.forEach((name, i) => {
     const col = i % ATLAS_COLS, row = Math.floor(i / ATLAS_COLS);
-    PAINTERS[name](ctx, col * TILE, row * TILE);
+    blit(PAINTERS[name], col, row, 5000 + i);
     index[name] = [col, row];
   });
   const crackIndex = [];
   for (let s = 0; s < CRACK_STAGES; s++) {
     const i = names.length + s;
     const col = i % ATLAS_COLS, row = Math.floor(i / ATLAS_COLS);
-    paintCrack(ctx, col * TILE, row * TILE, s);
+    blit((c, x, y) => paintCrack(c, x, y, s), col, row, 0, false);
     crackIndex.push([col, row]);
   }
 
@@ -1333,7 +1361,7 @@ function buildAtlas() {
   const cols = ATLAS_COLS;
   function tileUV([col, row]) {
     // tiny inset avoids atlas bleeding at tile edges
-    const e = 0.02 / TILE;
+    const e = 0.02 / OUT;
     const u0 = col / cols + e, v1 = 1 - row / rows - e;
     const u1 = (col + 1) / cols - e, v0 = 1 - (row + 1) / rows + e;
     return [u0, v0, u1, v1];
@@ -1346,9 +1374,9 @@ function buildAtlas() {
     crackUV: (stage) => tileUV(crackIndex[Math.max(0, Math.min(CRACK_STAGES - 1, stage))]),
     tileCanvas(name) {
       const c = document.createElement('canvas');
-      c.width = TILE; c.height = TILE;
+      c.width = OUT; c.height = OUT;
       const [col, row] = index[name] || index.stone;
-      c.getContext('2d').drawImage(canvas, col * TILE, row * TILE, TILE, TILE, 0, 0, TILE, TILE);
+      c.getContext('2d').drawImage(canvas, col * OUT, row * OUT, OUT, OUT, 0, 0, OUT, OUT);
       return c;
     },
   };
@@ -2279,14 +2307,19 @@ class Net {
 
   async createServer({ name, mode, cheats, username }) {
     if (!(await this.init())) return null;
-    const { push, set } = this._fns;
-    const seed = Math.floor(Math.random() * 2 ** 31);
-    const r = push(this._ref('servers'));
-    await set(r, {
-      name, mode, cheats: !!cheats, seed,
-      creator: this.uid, creatorName: username, created: Date.now(),
-    });
-    return r.key;
+    try {
+      const { push, set } = this._fns;
+      const seed = Math.floor(Math.random() * 2 ** 31);
+      const r = push(this._ref('servers'));
+      await set(r, {
+        name, mode, cheats: !!cheats, seed,
+        creator: this.uid, creatorName: username, created: Date.now(),
+      });
+      return r.key;
+    } catch (err) {
+      console.warn('createServer failed:', err);
+      return null;
+    }
   }
 
   // ---------------- Live session ----------------
@@ -3402,7 +3435,7 @@ class Inventory {
     // Items (sticks, ingots, tools...) render as flat sprites
     if (id >= 256) {
       const tile = this.atlas.tileCanvas(itemDef(id).icon || 'stone');
-      ctx.drawImage(tile, 0, 0, 16, 16, 0, 0, 32, 32);
+      ctx.drawImage(tile, 0, 0, tile.width, tile.height, 0, 0, 32, 32);
       this._iconCache.set(id, c);
       return c;
     }

@@ -87,14 +87,19 @@ export class Net {
 
   async createServer({ name, mode, cheats, username }) {
     if (!(await this.init())) return null;
-    const { push, set } = this._fns;
-    const seed = Math.floor(Math.random() * 2 ** 31);
-    const r = push(this._ref('servers'));
-    await set(r, {
-      name, mode, cheats: !!cheats, seed,
-      creator: this.uid, creatorName: username, created: Date.now(),
-    });
-    return r.key;
+    try {
+      const { push, set } = this._fns;
+      const seed = Math.floor(Math.random() * 2 ** 31);
+      const r = push(this._ref('servers'));
+      await set(r, {
+        name, mode, cheats: !!cheats, seed,
+        creator: this.uid, creatorName: username, created: Date.now(),
+      });
+      return r.key;
+    } catch (err) {
+      console.warn('createServer failed:', err);
+      return null;
+    }
   }
 
   // ---------------- Live session ----------------
