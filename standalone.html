@@ -5551,13 +5551,15 @@ function setMode(mode) {
   if (game) game.player.enabled = mode === 'playing';
   if (mode === 'playing') {
     menu.hide();
-    // Fullscreen while playing: this is the only state where the browser
-    // lets us capture Ctrl+W (Keyboard Lock API) — and it feels right anyway.
+    // Fullscreen first (enables Ctrl+W capture), THEN pointer lock — asking
+    // for both at once makes Chrome reject the pointer lock mid-transition.
     if (!document.fullscreenElement) {
-      try { document.documentElement.requestFullscreen()?.catch?.(() => {}); } catch { /* needs gesture */ }
-    }
-    if (document.pointerLockElement !== renderer.domElement) {
-      try { renderer.domElement.requestPointerLock()?.catch?.(() => {}); } catch { /* no gesture yet */ }
+      let fsPromise = null;
+      try { fsPromise = document.documentElement.requestFullscreen(); } catch { /* needs gesture */ }
+      if (fsPromise?.then) fsPromise.then(lockPointer, lockPointer);
+      else lockPointer();
+    } else {
+      lockPointer();
     }
   } else if (mode === 'pause') {
     menu.showPause();
@@ -5567,11 +5569,29 @@ function setMode(mode) {
   }
 }
 
+function lockPointer() {
+  if (uiMode !== 'playing') return;
+  if (document.pointerLockElement !== renderer.domElement) {
+    try { renderer.domElement.requestPointerLock()?.catch?.(() => {}); } catch { /* retried on click */ }
+  }
+}
+
+// If the lock ever fails (Chrome's 1.25 s Esc cooldown, transition races),
+// clicking the game recaptures the mouse.
+renderer.domElement.addEventListener('click', lockPointer);
+
 // Losing pointer lock while playing (Esc) opens the pause menu
 document.addEventListener('pointerlockchange', () => {
   const locked = document.pointerLockElement === renderer.domElement;
   if (!locked && uiMode === 'playing') setMode('pause');
   if (locked && game) setMode('playing');
+});
+
+// Esc still pauses even when the mouse was never captured
+document.addEventListener('keydown', (e) => {
+  if (e.code === 'Escape' && uiMode === 'playing' && !document.pointerLockElement && game) {
+    setMode('pause');
+  }
 });
 
 document.addEventListener('keydown', (e) => {
