@@ -153,11 +153,21 @@ export class Player {
     const pos = this.position;
     const wasOnGround = this.onGround;
 
+    // Auto step-up: walking into a 1-block ledge climbs it automatically
+    // (not while flying, sneaking, or swimming — sneaking keeps you safe).
+    const tryStepUp = () => {
+      if (!wasOnGround || this.flying || this.crouching || this.inWater) return false;
+      pos.y += 1.05;
+      if (!this.collides(pos)) return true;
+      pos.y -= 1.05;
+      return false;
+    };
+
     pos.x += this.velocity.x * dt;
-    if (this.collides(pos)) { pos.x -= this.velocity.x * dt; this.velocity.x = 0; }
+    if (this.collides(pos) && !tryStepUp()) { pos.x -= this.velocity.x * dt; this.velocity.x = 0; }
 
     pos.z += this.velocity.z * dt;
-    if (this.collides(pos)) { pos.z -= this.velocity.z * dt; this.velocity.z = 0; }
+    if (this.collides(pos) && !tryStepUp()) { pos.z -= this.velocity.z * dt; this.velocity.z = 0; }
 
     pos.y += this.velocity.y * dt;
     this.onGround = false;
@@ -228,8 +238,11 @@ export class Player {
     }
 
     // ---- Camera ----
+    // Vertical smoothing hides the pop from auto step-up (snaps on teleports)
+    if (this._smoothY === undefined || Math.abs(pos.y - this._smoothY) > 3) this._smoothY = pos.y;
+    this._smoothY += (pos.y - this._smoothY) * Math.min(1, dt * 14);
     const eyeX = pos.x + bobX * Math.cos(this.yaw);
-    const eyeY = pos.y + this.eyeHeight + bobY;
+    const eyeY = this._smoothY + this.eyeHeight + bobY;
     const eyeZ = pos.z + bobX * Math.sin(this.yaw);
     this.camera.rotation.set(0, 0, 0);
     this.camera.rotateY(this.yaw);
