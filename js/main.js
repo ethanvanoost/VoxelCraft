@@ -119,13 +119,9 @@ async function startGame(opts) {
   };
 
   // ---- Restore / spawn ----
-  const saved = SaveSystem.peek(saveKey);
-  if (saved && (!saved.seed || saved.seed === seed)) saveSystem.restore(saved);
-  else {
-    // Spiral out from the origin until we find dry land to spawn on —
-    // skipping columns where a cave/ravine has carved away the surface
-    let sx = 0, sz = 0;
-    outer:
+  // Safe spawn: spiral out from the origin for dry land where no cave or
+  // ravine has carved away the surface. Used for first spawn AND respawns.
+  const findSafeSpawn = () => {
     for (let r = 0; r < 64; r++) {
       for (let a = 0; a < Math.max(1, r * 6); a++) {
         const ang = (a / Math.max(1, r * 6)) * Math.PI * 2;
@@ -134,12 +130,17 @@ async function startGame(opts) {
         const h = world.gen.column(x, z).height;
         if (h > CONFIG.SEA_LEVEL + 1 &&
             !world.gen.isCave(x, h, z) && !world.gen.isCave(x, h - 1, z) && !world.gen.isCave(x, h - 2, z)) {
-          sx = x; sz = z; break outer;
+          return new THREE.Vector3(x + 0.5, h + 2, z + 0.5);
         }
       }
     }
-    player.position.set(sx + 0.5, world.surfaceHeight(sx, sz) + 2, sz + 0.5);
-  }
+    return new THREE.Vector3(0.5, world.surfaceHeight(0, 0) + 2, 0.5);
+  };
+  player.spawnPoint = findSafeSpawn();
+
+  const saved = SaveSystem.peek(saveKey);
+  if (saved && (!saved.seed || saved.seed === seed)) saveSystem.restore(saved);
+  else player.position.copy(player.spawnPoint);
 
   // ---- Block use: crafting table / chest ----
   interaction.onUseBlock = (blockId) => {
@@ -169,11 +170,14 @@ async function startGame(opts) {
       return true;
     }
     if (blockId === BLOCK.BED) {
+      // Sleeping (or trying to) sets your respawn point to this bed
+      const bp = interaction.target.pos;
+      player.spawnPoint = new THREE.Vector3(bp.x + 0.5, bp.y + 1, bp.z + 0.5);
       if (sky.daylight < 0.15) {
         sky.time = 0.01;   // sunrise
-        commands.print('You sleep through the night... good morning!');
+        commands.print('You sleep through the night... good morning! (Respawn point set)');
       } else {
-        commands.print('You can only sleep at night.');
+        commands.print('You can only sleep at night. (Respawn point set)');
       }
       return true;
     }

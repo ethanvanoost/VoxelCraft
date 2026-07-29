@@ -298,10 +298,13 @@ export class Player {
   die() {
     this.dead = true;
     this.onDeath?.(this.position.clone());   // main.js: scatter inventory as drops
-    // Simple respawn after a moment at the surface
+    // Respawn at the safe spawn point (set by main.js; updated by sleeping)
     setTimeout(() => {
-      const y = this.world.surfaceHeight(0, 0) + 2;
-      this.position.set(0.5, y, 0.5);
+      if (this.spawnPoint) {
+        this.position.copy(this.spawnPoint);
+      } else {
+        this.position.set(0.5, this.world.surfaceHeight(0, 0) + 2, 0.5);
+      }
       this.velocity.set(0, 0, 0);
       this.health = 20;
       this.hunger = 20;
