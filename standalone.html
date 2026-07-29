@@ -3819,6 +3819,22 @@ class Menu {
     this._migrateOldSave();
     this._bind();
     this.show(this.username ? 'main' : 'username');
+
+    // A name picked before Firebase was configured only exists locally —
+    // claim it globally in the background on launch.
+    if (this.username && this.net.available) {
+      this.net.claimUsername(this.username).then((r) => {
+        if (r === 'taken') {
+          // Someone else owns this name globally — ask for a new one
+          localStorage.removeItem('vc_username');
+          this.username = '';
+          this.show('username');
+          const status = $('username-status');
+          status.textContent = 'Your old name is taken globally — pick a new one.';
+          status.className = 'menu-note err';
+        }
+      });
+    }
   }
 
   // ---------------- storage ----------------
