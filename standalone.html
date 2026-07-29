@@ -211,51 +211,75 @@ html, body {
 }
 #creative-grid { max-height: 220px; overflow-y: auto; }
 
-/* ---------------- Menu ---------------- */
-#menu { background: rgba(10, 10, 30, 0.75); }
-#menu-window { text-align: center; max-height: 92vh; overflow-y: auto; padding: 10px 20px; }
-.screen { min-width: 380px; }
-.menu-label { font-size: 18px; margin: 10px 0; text-shadow: 2px 2px 0 #000; }
-.menu-note { font-size: 13px; color: #9fd39f; margin: 8px 0; min-height: 17px; text-shadow: 1px 1px 0 #000; }
-.menu-note.err { color: #e08080; }
-.mc-input {
+/* ---------------- Menu (Minecraft-style) ---------------- */
+#menu {
+  /* dirt-tile background is generated at runtime and set by menu.js */
+  background-color: #1c1c1c;
+  background-size: 64px 64px;
+  image-rendering: pixelated;
+}
+#menu-window { text-align: center; max-height: 94vh; overflow-y: auto; padding: 10px 24px; }
+.screen { min-width: 420px; }
+.menu-label {
+  font-size: 20px; margin: 4px 0 12px;
+  color: #fff; text-shadow: 2px 2px 0 #3f3f3f;
+}
+.menu-note { font-size: 13px; color: #9fd39f; margin: 6px 0; min-height: 17px; text-shadow: 1px 1px 0 #000; }
+.menu-note.err { color: #ff8080; }
+
+.mc-input, select.mc-input {
   display: inline-block;
-  width: 320px;
+  width: 260px;
   padding: 10px;
-  margin: 5px auto;
-  background: rgba(0,0,0,0.6);
-  border: 2px solid #888;
-  color: #fff;
+  background: #000;
+  border: 2px solid #a0a0a0;
+  color: #e0e0e0;
   font-family: var(--pixel-font);
   font-size: 15px;
   outline: none;
 }
-.mc-input.narrow { width: 152px; }
-.form-row { margin: 4px 0; display: flex; gap: 8px; justify-content: center; align-items: center; }
-.check { font-size: 14px; color: #ddd; text-shadow: 1px 1px 0 #000; }
+.mc-input:focus { border-color: #fff; }
+.field-label {
+  width: 110px; text-align: right;
+  font-size: 13px; color: #ccc; text-shadow: 1px 1px 0 #000;
+}
+.form-row { margin: 8px 0; display: flex; gap: 10px; justify-content: center; align-items: center; }
+.check { font-size: 13px; color: #ddd; text-shadow: 1px 1px 0 #000; width: 260px; text-align: left; }
+
+.btn-row { display: flex; gap: 8px; width: 404px; margin: 8px auto 0; }
+.mc-btn.half { flex: 1; width: auto; margin: 0; padding: 11px 4px; font-size: 15px; }
+.mc-btn:disabled {
+  color: #7a7a7a; cursor: default;
+  text-shadow: none;
+}
+.mc-btn:disabled:hover { background: #6d6d6d; border-color: #aaa #333 #333 #aaa; }
+
+/* Minecraft server/world list */
 .list {
-  width: 380px;
-  max-height: 200px;
+  width: 404px;
+  height: 232px;
   overflow-y: auto;
-  margin: 0 auto 12px;
-  border: 2px solid #555;
-  background: rgba(0,0,0,0.5);
+  margin: 0 auto;
+  border: 2px solid #000;
+  background: rgba(0,0,0,0.65);
+  box-shadow: inset 0 0 12px rgba(0,0,0,0.8);
 }
 .list-item {
   display: flex; justify-content: space-between; align-items: center;
+  margin: 4px;
   padding: 8px 10px;
-  border-bottom: 1px solid #333;
+  border: 2px solid transparent;
   cursor: pointer;
-  font-size: 14px;
+  font-size: 15px;
   text-align: left;
+  color: #fff;
+  text-shadow: 1px 1px 0 #000;
 }
-.list-item:hover { background: rgba(120,140,220,0.25); }
-.list-item .sub { display: block; font-size: 11px; color: #aaa; }
-.list-item .del {
-  color: #e08080; padding: 2px 8px; cursor: pointer;
-  border: 1px solid #7a4444; margin-left: 8px; flex-shrink: 0;
-}
-.list-empty { padding: 14px; font-size: 13px; color: #999; }
+.list-item:hover { border-color: #7a7a7a; }
+.list-item.selected { border-color: #fff; background: rgba(255,255,255,0.08); }
+.list-item .sub { display: block; font-size: 12px; color: #9a9a9a; margin-top: 2px; }
+.list-item .online-dot { color: #6fe36f; font-size: 12px; flex-shrink: 0; margin-left: 8px; }
+.list-empty { padding: 18px; font-size: 13px; color: #999; text-align: center; }
 .skin-row label { width: 60px; text-align: right; font-size: 14px; }
 #skin-preview {
   image-rendering: pixelated;
@@ -264,27 +288,31 @@ html, body {
   margin: 6px auto; display: block;
 }
 .logo {
-  font-size: 56px;
-  letter-spacing: 4px;
+  font-size: 58px;
+  font-weight: bold;
+  letter-spacing: 5px;
   color: #fff;
-  text-shadow: 4px 4px 0 #3f3f3f;
-  margin-bottom: 30px;
+  text-shadow: 3px 3px 0 #555, 6px 6px 0 rgba(0,0,0,0.7);
+  margin-bottom: 26px;
 }
 .mc-btn {
   display: block;
-  width: 320px;
+  width: 404px;
   margin: 8px auto;
   padding: 12px;
   font-family: var(--pixel-font);
-  font-size: 17px;
+  font-size: 16px;
   color: #fff;
-  background: #6d6d6d;
-  border: 3px solid;
-  border-color: #aaa #333 #333 #aaa;
+  background: linear-gradient(#828282, #5f5f5f);
+  border: 2px solid #000;
+  box-shadow: inset 2px 2px 0 rgba(255,255,255,0.3), inset -2px -2px 0 rgba(0,0,0,0.35);
   cursor: pointer;
-  text-shadow: 2px 2px 0 rgba(0,0,0,0.5);
+  text-shadow: 2px 2px 0 rgba(0,0,0,0.6);
 }
-.mc-btn:hover { background: #7d8bc7; }
+.mc-btn:hover:not(:disabled) {
+  background: linear-gradient(#8f9ac9, #6a76ad);
+  border-color: #fff;
+}
 .mc-btn.small { width: 220px; padding: 8px; font-size: 14px; margin: 0 auto; }
 .mc-btn.danger:hover { background: #c75b5b; }
 .menu-hint {
@@ -396,42 +424,72 @@ html, body {
       </div>
     </div>
 
-    <!-- Singleplayer world list -->
+    <!-- Singleplayer: world select -->
     <div id="screen-worlds" class="screen hidden">
-      <div class="menu-label">Your Worlds</div>
+      <div class="menu-label">Select World</div>
       <div id="world-list" class="list"></div>
-      <div class="form-row">
-        <input id="world-name" class="mc-input" placeholder="New world name" maxlength="24">
-        <input id="world-seed" class="mc-input narrow" placeholder="Seed (optional)">
+      <div class="btn-row">
+        <button id="btn-world-play" class="mc-btn half" disabled>Play Selected World</button>
+        <button id="btn-world-new" class="mc-btn half">Create New World</button>
       </div>
-      <div class="form-row">
-        <select id="world-mode" class="mc-input narrow">
-          <option value="survival">Survival</option>
-          <option value="creative">Creative</option>
-        </select>
-        <label class="check"><input type="checkbox" id="world-cheats"> Allow cheats</label>
+      <div class="btn-row">
+        <button id="btn-world-delete" class="mc-btn half" disabled>Delete</button>
+        <button id="btn-worlds-back" class="mc-btn half">Back</button>
       </div>
-      <button id="btn-world-create" class="mc-btn">Create New World</button>
-      <button id="btn-worlds-back" class="mc-btn small">Back</button>
     </div>
 
-    <!-- Multiplayer server list -->
-    <div id="screen-servers" class="screen hidden">
-      <div class="menu-label">Multiplayer</div>
-      <div id="server-status" class="menu-note"></div>
-      <div id="server-list" class="list"></div>
-      <div class="form-row">
-        <input id="server-name" class="mc-input" placeholder="New server name" maxlength="24">
-      </div>
-      <div class="form-row">
-        <select id="server-mode" class="mc-input narrow">
+    <!-- Singleplayer: create world -->
+    <div id="screen-world-create" class="screen hidden">
+      <div class="menu-label">Create New World</div>
+      <div class="form-row"><label class="field-label">World Name</label>
+        <input id="world-name" class="mc-input" placeholder="New World" maxlength="24"></div>
+      <div class="form-row"><label class="field-label">Seed</label>
+        <input id="world-seed" class="mc-input" placeholder="Leave blank for random"></div>
+      <div class="form-row"><label class="field-label">Game Mode</label>
+        <select id="world-mode" class="mc-input">
           <option value="survival">Survival</option>
           <option value="creative">Creative</option>
-        </select>
-        <label class="check"><input type="checkbox" id="server-cheats"> Allow cheats for everyone</label>
+        </select></div>
+      <div class="form-row"><label class="field-label">Allow Cheats</label>
+        <label class="check"><input type="checkbox" id="world-cheats"> commands like /give, /tp</label></div>
+      <div class="btn-row">
+        <button id="btn-world-create" class="mc-btn half">Create New World</button>
+        <button id="btn-world-cancel" class="mc-btn half">Cancel</button>
       </div>
-      <button id="btn-server-create" class="mc-btn">Create Server</button>
-      <button id="btn-servers-back" class="mc-btn small">Back</button>
+    </div>
+
+    <!-- Multiplayer: server list -->
+    <div id="screen-servers" class="screen hidden">
+      <div class="menu-label">Play Multiplayer</div>
+      <div id="server-status" class="menu-note"></div>
+      <div id="server-list" class="list"></div>
+      <div class="btn-row">
+        <button id="btn-server-join" class="mc-btn half" disabled>Join Server</button>
+        <button id="btn-server-refresh" class="mc-btn half">Refresh</button>
+      </div>
+      <div class="btn-row">
+        <button id="btn-server-new" class="mc-btn half">Create Server</button>
+        <button id="btn-servers-back" class="mc-btn half">Back</button>
+      </div>
+    </div>
+
+    <!-- Multiplayer: create server -->
+    <div id="screen-server-create" class="screen hidden">
+      <div class="menu-label">Create Server</div>
+      <div class="form-row"><label class="field-label">Server Name</label>
+        <input id="server-name" class="mc-input" placeholder="My Server" maxlength="24"></div>
+      <div class="form-row"><label class="field-label">Game Mode</label>
+        <select id="server-mode" class="mc-input">
+          <option value="survival">Survival</option>
+          <option value="creative">Creative</option>
+        </select></div>
+      <div class="form-row"><label class="field-label">Allow Cheats</label>
+        <label class="check"><input type="checkbox" id="server-cheats"> for everyone (you always can)</label></div>
+      <div id="server-create-status" class="menu-note"></div>
+      <div class="btn-row">
+        <button id="btn-server-create" class="mc-btn half">Create Server</button>
+        <button id="btn-server-cancel" class="mc-btn half">Cancel</button>
+      </div>
     </div>
 
     <!-- Skin editor -->
@@ -2451,7 +2509,6 @@ class Player {
       if (!this.enabled) return;
       this.keys[e.code] = true;
       if (e.code === 'KeyF') this.toggleFly();
-      if (e.code === 'Space') this._tryJump();
       if (e.code === 'F5') {   // camera toggle instead of page refresh
         e.preventDefault();
         this.cameraMode = (this.cameraMode + 1) % 3;
@@ -2533,6 +2590,9 @@ class Player {
     const accel = this.onGround || this.flying ? 12 : 4;
     this.velocity.x += (mx * speed - this.velocity.x) * Math.min(1, accel * dt);
     this.velocity.z += (mz * speed - this.velocity.z) * Math.min(1, accel * dt);
+
+    // Holding Space keeps jumping every time you touch the ground
+    if (this.keys['Space']) this._tryJump();
 
     // ---- Vertical motion ----
     if (this.flying) {
@@ -3849,6 +3909,11 @@ class Menu {
     this.skin = this._loadSkin();
     this.inGame = false;
 
+    this.selectedWorld = null;
+    this.selectedServer = null;
+    this._servers = [];
+
+    this._paintBackground();
     this._migrateOldSave();
     this._bind();
     this.show(this.username ? 'main' : 'username');
@@ -3868,6 +3933,23 @@ class Menu {
         }
       });
     }
+  }
+
+  /** Minecraft-style tiled dark dirt background, generated on a canvas. */
+  _paintBackground() {
+    const c = document.createElement('canvas');
+    c.width = 16; c.height = 16;
+    const ctx = c.getContext('2d');
+    let s = 1234;
+    const rand = () => { s = (Math.imul(s, 48271) % 2147483647 + 2147483647) % 2147483647; return s / 2147483647; };
+    for (let y = 0; y < 16; y++) {
+      for (let x = 0; x < 16; x++) {
+        const v = 28 + Math.floor(rand() * 22);
+        ctx.fillStyle = `rgb(${v + 8},${Math.floor(v * 0.72)},${Math.floor(v * 0.5)})`;
+        ctx.fillRect(x, y, 1, 1);
+      }
+    }
+    $('menu').style.backgroundImage = `url(${c.toDataURL()})`;
   }
 
   // ---------------- storage ----------------
@@ -3932,12 +4014,34 @@ class Menu {
       this.show(this.inGame ? 'pause' : (this._settingsReturn === 'settings' ? 'main' : this._settingsReturn || 'main')));
 
     // ---- worlds ----
-    $('btn-world-create').addEventListener('click', () => this._createWorld());
+    $('btn-world-play').addEventListener('click', () => {
+      const w = this.worlds().find((x) => x.id === this.selectedWorld);
+      if (w) this.hooks.startWorld(w);
+    });
+    $('btn-world-new').addEventListener('click', () => this.show('world-create'));
+    $('btn-world-delete').addEventListener('click', () => {
+      const w = this.worlds().find((x) => x.id === this.selectedWorld);
+      if (w && confirm(`Delete world "${w.name}" forever?`)) {
+        localStorage.removeItem('vc_world_' + w.id);
+        this._saveWorlds(this.worlds().filter((x) => x.id !== w.id));
+        this.selectedWorld = null;
+        this._renderWorlds();
+      }
+    });
     $('btn-worlds-back').addEventListener('click', () => this.show('main'));
+    $('btn-world-create').addEventListener('click', () => this._createWorld());
+    $('btn-world-cancel').addEventListener('click', () => this.show('worlds'));
 
     // ---- servers ----
-    $('btn-server-create').addEventListener('click', () => this._createServer());
+    $('btn-server-join').addEventListener('click', () => {
+      const s = this._servers.find((x) => x.id === this.selectedServer);
+      if (s) this.hooks.joinServer(s);
+    });
+    $('btn-server-refresh').addEventListener('click', () => this._renderServers());
+    $('btn-server-new').addEventListener('click', () => this.show('server-create'));
     $('btn-servers-back').addEventListener('click', () => this.show('main'));
+    $('btn-server-create').addEventListener('click', () => this._createServer());
+    $('btn-server-cancel').addEventListener('click', () => this.show('servers'));
 
     // ---- skin ----
     for (const part of ['head', 'body', 'arms', 'legs', 'eyes']) {
@@ -3991,34 +4095,31 @@ class Menu {
     const list = $('world-list');
     list.innerHTML = '';
     const worlds = this.worlds();
+    this._syncWorldButtons();
     if (!worlds.length) {
-      list.innerHTML = '<div class="list-empty">No worlds yet — create one below.</div>';
+      list.innerHTML = '<div class="list-empty">No worlds yet.<br>Click "Create New World" to start.</div>';
       return;
     }
     for (const w of worlds) {
       const item = document.createElement('div');
-      item.className = 'list-item';
-      const label = document.createElement('div');
-      label.innerHTML = `<b>${escapeHtml(w.name)}</b>` +
-        `<span class="sub">${w.mode === 'creative' ? 'Creative' : 'Survival'}` +
-        `${w.cheats ? ' · cheats' : ''} · seed ${w.seed}</span>`;
-      const del = document.createElement('span');
-      del.className = 'del';
-      del.textContent = '✕';
-      del.title = 'Delete world';
-      del.addEventListener('click', (e) => {
-        e.stopPropagation();
-        if (confirm(`Delete world "${w.name}" forever?`)) {
-          localStorage.removeItem('vc_world_' + w.id);
-          this._saveWorlds(this.worlds().filter((x) => x.id !== w.id));
-          this._renderWorlds();
-        }
+      item.className = 'list-item' + (w.id === this.selectedWorld ? ' selected' : '');
+      item.innerHTML = `<div><b>${escapeHtml(w.name)}</b>` +
+        `<span class="sub">${w.mode === 'creative' ? 'Creative Mode' : 'Survival Mode'}` +
+        `${w.cheats ? ' · Cheats' : ''} · Seed: ${w.seed}</span></div>`;
+      // click selects (Minecraft-style); double-click plays
+      item.addEventListener('click', () => {
+        this.selectedWorld = w.id;
+        this._renderWorlds();
       });
-      item.appendChild(label);
-      item.appendChild(del);
-      item.addEventListener('click', () => this.hooks.startWorld(w));
+      item.addEventListener('dblclick', () => this.hooks.startWorld(w));
       list.appendChild(item);
     }
+  }
+
+  _syncWorldButtons() {
+    const has = !!this.selectedWorld;
+    $('btn-world-play').disabled = !has;
+    $('btn-world-delete').disabled = !has;
   }
 
   _createWorld() {
@@ -4040,6 +4141,10 @@ class Menu {
     this.hooks.startWorld(meta);
   }
 
+  _syncServerButtons() {
+    $('btn-server-join').disabled = !this.selectedServer;
+  }
+
   // ---------------- multiplayer ----------------
 
   async _renderServers() {
@@ -4059,36 +4164,61 @@ class Menu {
       status.className = 'menu-note err';
       return;
     }
-    status.textContent = servers.length ? `${servers.length} server(s) online` : '';
+    this._servers = servers;
+    this._syncServerButtons();
+    status.textContent = servers.length ? `${servers.length} server(s) found` : '';
     if (!servers.length) {
-      list.innerHTML = '<div class="list-empty">No servers yet — create the first one!</div>';
+      list.innerHTML = '<div class="list-empty">No servers yet.<br>Click "Create Server" to host the first one!</div>';
       return;
     }
     for (const s of servers) {
       const item = document.createElement('div');
-      item.className = 'list-item';
+      item.className = 'list-item' + (s.id === this.selectedServer ? ' selected' : '');
       item.innerHTML = `<div><b>${escapeHtml(s.name)}</b>` +
-        `<span class="sub">${s.mode === 'creative' ? 'Creative' : 'Survival'}` +
-        `${s.cheats ? ' · cheats for all' : ''} · by ${escapeHtml(s.creatorName || '?')}</span></div>` +
-        `<span>Join →</span>`;
-      item.addEventListener('click', () => this.hooks.joinServer(s));
+        `<span class="sub">${s.mode === 'creative' ? 'Creative Mode' : 'Survival Mode'}` +
+        `${s.cheats ? ' · Cheats for all' : ''} · by ${escapeHtml(s.creatorName || '?')}</span></div>` +
+        `<span class="online-dot">●</span>`;
+      item.addEventListener('click', () => {
+        this.selectedServer = s.id;
+        this._renderServersSelectionOnly();
+      });
+      item.addEventListener('dblclick', () => this.hooks.joinServer(s));
       list.appendChild(item);
     }
   }
 
+  /** Re-highlight selection without refetching from Firebase. */
+  _renderServersSelectionOnly() {
+    const list = $('server-list');
+    [...list.children].forEach((el, i) => {
+      const s = this._servers[i];
+      if (s) el.classList.toggle('selected', s.id === this.selectedServer);
+    });
+    this._syncServerButtons();
+  }
+
   async _createServer() {
     if (!this.net.available) return;
+    const status = $('server-create-status');
+    const btn = $('btn-server-create');
     const name = $('server-name').value.trim() || `${this.username}'s server`;
-    $('server-status').textContent = 'Creating server…';
+    btn.disabled = true;
+    status.textContent = 'Creating server…';
+    status.className = 'menu-note';
     const id = await this.net.createServer({
       name,
       mode: $('server-mode').value,
       cheats: $('server-cheats').checked,
       username: this.username,
     });
-    if (!id) { $('server-status').textContent = 'Failed to create server.'; return; }
+    btn.disabled = false;
+    if (!id) {
+      status.textContent = 'Failed — are the Firebase rules published? (see firebase-rules.md)';
+      status.className = 'menu-note err';
+      return;
+    }
     const servers = await this.net.listServers();
-    const mine = servers.find((s) => s.id === id);
+    const mine = (servers || []).find((s) => s.id === id);
     if (mine) this.hooks.joinServer(mine);
   }
 
@@ -4793,6 +4923,11 @@ function setMode(mode) {
   if (game) game.player.enabled = mode === 'playing';
   if (mode === 'playing') {
     menu.hide();
+    // Fullscreen while playing: this is the only state where the browser
+    // lets us capture Ctrl+W (Keyboard Lock API) — and it feels right anyway.
+    if (!document.fullscreenElement) {
+      try { document.documentElement.requestFullscreen()?.catch?.(() => {}); } catch { /* needs gesture */ }
+    }
     if (document.pointerLockElement !== renderer.domElement) {
       try { renderer.domElement.requestPointerLock()?.catch?.(() => {}); } catch { /* no gesture yet */ }
     }

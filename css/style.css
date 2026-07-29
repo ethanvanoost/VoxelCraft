@@ -204,51 +204,75 @@ html, body {
 }
 #creative-grid { max-height: 220px; overflow-y: auto; }
 
-/* ---------------- Menu ---------------- */
-#menu { background: rgba(10, 10, 30, 0.75); }
-#menu-window { text-align: center; max-height: 92vh; overflow-y: auto; padding: 10px 20px; }
-.screen { min-width: 380px; }
-.menu-label { font-size: 18px; margin: 10px 0; text-shadow: 2px 2px 0 #000; }
-.menu-note { font-size: 13px; color: #9fd39f; margin: 8px 0; min-height: 17px; text-shadow: 1px 1px 0 #000; }
-.menu-note.err { color: #e08080; }
-.mc-input {
+/* ---------------- Menu (Minecraft-style) ---------------- */
+#menu {
+  /* dirt-tile background is generated at runtime and set by menu.js */
+  background-color: #1c1c1c;
+  background-size: 64px 64px;
+  image-rendering: pixelated;
+}
+#menu-window { text-align: center; max-height: 94vh; overflow-y: auto; padding: 10px 24px; }
+.screen { min-width: 420px; }
+.menu-label {
+  font-size: 20px; margin: 4px 0 12px;
+  color: #fff; text-shadow: 2px 2px 0 #3f3f3f;
+}
+.menu-note { font-size: 13px; color: #9fd39f; margin: 6px 0; min-height: 17px; text-shadow: 1px 1px 0 #000; }
+.menu-note.err { color: #ff8080; }
+
+.mc-input, select.mc-input {
   display: inline-block;
-  width: 320px;
+  width: 260px;
   padding: 10px;
-  margin: 5px auto;
-  background: rgba(0,0,0,0.6);
-  border: 2px solid #888;
-  color: #fff;
+  background: #000;
+  border: 2px solid #a0a0a0;
+  color: #e0e0e0;
   font-family: var(--pixel-font);
   font-size: 15px;
   outline: none;
 }
-.mc-input.narrow { width: 152px; }
-.form-row { margin: 4px 0; display: flex; gap: 8px; justify-content: center; align-items: center; }
-.check { font-size: 14px; color: #ddd; text-shadow: 1px 1px 0 #000; }
+.mc-input:focus { border-color: #fff; }
+.field-label {
+  width: 110px; text-align: right;
+  font-size: 13px; color: #ccc; text-shadow: 1px 1px 0 #000;
+}
+.form-row { margin: 8px 0; display: flex; gap: 10px; justify-content: center; align-items: center; }
+.check { font-size: 13px; color: #ddd; text-shadow: 1px 1px 0 #000; width: 260px; text-align: left; }
+
+.btn-row { display: flex; gap: 8px; width: 404px; margin: 8px auto 0; }
+.mc-btn.half { flex: 1; width: auto; margin: 0; padding: 11px 4px; font-size: 15px; }
+.mc-btn:disabled {
+  color: #7a7a7a; cursor: default;
+  text-shadow: none;
+}
+.mc-btn:disabled:hover { background: #6d6d6d; border-color: #aaa #333 #333 #aaa; }
+
+/* Minecraft server/world list */
 .list {
-  width: 380px;
-  max-height: 200px;
+  width: 404px;
+  height: 232px;
   overflow-y: auto;
-  margin: 0 auto 12px;
-  border: 2px solid #555;
-  background: rgba(0,0,0,0.5);
+  margin: 0 auto;
+  border: 2px solid #000;
+  background: rgba(0,0,0,0.65);
+  box-shadow: inset 0 0 12px rgba(0,0,0,0.8);
 }
 .list-item {
   display: flex; justify-content: space-between; align-items: center;
+  margin: 4px;
   padding: 8px 10px;
-  border-bottom: 1px solid #333;
+  border: 2px solid transparent;
   cursor: pointer;
-  font-size: 14px;
+  font-size: 15px;
   text-align: left;
+  color: #fff;
+  text-shadow: 1px 1px 0 #000;
 }
-.list-item:hover { background: rgba(120,140,220,0.25); }
-.list-item .sub { display: block; font-size: 11px; color: #aaa; }
-.list-item .del {
-  color: #e08080; padding: 2px 8px; cursor: pointer;
-  border: 1px solid #7a4444; margin-left: 8px; flex-shrink: 0;
-}
-.list-empty { padding: 14px; font-size: 13px; color: #999; }
+.list-item:hover { border-color: #7a7a7a; }
+.list-item.selected { border-color: #fff; background: rgba(255,255,255,0.08); }
+.list-item .sub { display: block; font-size: 12px; color: #9a9a9a; margin-top: 2px; }
+.list-item .online-dot { color: #6fe36f; font-size: 12px; flex-shrink: 0; margin-left: 8px; }
+.list-empty { padding: 18px; font-size: 13px; color: #999; text-align: center; }
 .skin-row label { width: 60px; text-align: right; font-size: 14px; }
 #skin-preview {
   image-rendering: pixelated;
@@ -257,27 +281,31 @@ html, body {
   margin: 6px auto; display: block;
 }
 .logo {
-  font-size: 56px;
-  letter-spacing: 4px;
+  font-size: 58px;
+  font-weight: bold;
+  letter-spacing: 5px;
   color: #fff;
-  text-shadow: 4px 4px 0 #3f3f3f;
-  margin-bottom: 30px;
+  text-shadow: 3px 3px 0 #555, 6px 6px 0 rgba(0,0,0,0.7);
+  margin-bottom: 26px;
 }
 .mc-btn {
   display: block;
-  width: 320px;
+  width: 404px;
   margin: 8px auto;
   padding: 12px;
   font-family: var(--pixel-font);
-  font-size: 17px;
+  font-size: 16px;
   color: #fff;
-  background: #6d6d6d;
-  border: 3px solid;
-  border-color: #aaa #333 #333 #aaa;
+  background: linear-gradient(#828282, #5f5f5f);
+  border: 2px solid #000;
+  box-shadow: inset 2px 2px 0 rgba(255,255,255,0.3), inset -2px -2px 0 rgba(0,0,0,0.35);
   cursor: pointer;
-  text-shadow: 2px 2px 0 rgba(0,0,0,0.5);
+  text-shadow: 2px 2px 0 rgba(0,0,0,0.6);
 }
-.mc-btn:hover { background: #7d8bc7; }
+.mc-btn:hover:not(:disabled) {
+  background: linear-gradient(#8f9ac9, #6a76ad);
+  border-color: #fff;
+}
 .mc-btn.small { width: 220px; padding: 8px; font-size: 14px; margin: 0 auto; }
 .mc-btn.danger:hover { background: #c75b5b; }
 .menu-hint {

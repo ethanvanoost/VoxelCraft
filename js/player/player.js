@@ -50,7 +50,6 @@ export class Player {
       if (!this.enabled) return;
       this.keys[e.code] = true;
       if (e.code === 'KeyF') this.toggleFly();
-      if (e.code === 'Space') this._tryJump();
       if (e.code === 'F5') {   // camera toggle instead of page refresh
         e.preventDefault();
         this.cameraMode = (this.cameraMode + 1) % 3;
@@ -132,6 +131,9 @@ export class Player {
     const accel = this.onGround || this.flying ? 12 : 4;
     this.velocity.x += (mx * speed - this.velocity.x) * Math.min(1, accel * dt);
     this.velocity.z += (mz * speed - this.velocity.z) * Math.min(1, accel * dt);
+
+    // Holding Space keeps jumping every time you touch the ground
+    if (this.keys['Space']) this._tryJump();
 
     // ---- Vertical motion ----
     if (this.flying) {

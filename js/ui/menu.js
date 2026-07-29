@@ -25,6 +25,11 @@ export class Menu {
     this.skin = this._loadSkin();
     this.inGame = false;
 
+    this.selectedWorld = null;
+    this.selectedServer = null;
+    this._servers = [];
+
+    this._paintBackground();
     this._migrateOldSave();
     this._bind();
     this.show(this.username ? 'main' : 'username');
@@ -44,6 +49,23 @@ export class Menu {
         }
       });
     }
+  }
+
+  /** Minecraft-style tiled dark dirt background, generated on a canvas. */
+  _paintBackground() {
+    const c = document.createElement('canvas');
+    c.width = 16; c.height = 16;
+    const ctx = c.getContext('2d');
+    let s = 1234;
+    const rand = () => { s = (Math.imul(s, 48271) % 2147483647 + 2147483647) % 2147483647; return s / 2147483647; };
+    for (let y = 0; y < 16; y++) {
+      for (let x = 0; x < 16; x++) {
+        const v = 28 + Math.floor(rand() * 22);
+        ctx.fillStyle = `rgb(${v + 8},${Math.floor(v * 0.72)},${Math.floor(v * 0.5)})`;
+        ctx.fillRect(x, y, 1, 1);
+      }
+    }
+    $('menu').style.backgroundImage = `url(${c.toDataURL()})`;
   }
 
   // ---------------- storage ----------------
@@ -108,12 +130,34 @@ export class Menu {
       this.show(this.inGame ? 'pause' : (this._settingsReturn === 'settings' ? 'main' : this._settingsReturn || 'main')));
 
     // ---- worlds ----
-    $('btn-world-create').addEventListener('click', () => this._createWorld());
+    $('btn-world-play').addEventListener('click', () => {
+      const w = this.worlds().find((x) => x.id === this.selectedWorld);
+      if (w) this.hooks.startWorld(w);
+    });
+    $('btn-world-new').addEventListener('click', () => this.show('world-create'));
+    $('btn-world-delete').addEventListener('click', () => {
+      const w = this.worlds().find((x) => x.id === this.selectedWorld);
+      if (w && confirm(`Delete world "${w.name}" forever?`)) {
+        localStorage.removeItem('vc_world_' + w.id);
+        this._saveWorlds(this.worlds().filter((x) => x.id !== w.id));
+        this.selectedWorld = null;
+        this._renderWorlds();
+      }
+    });
     $('btn-worlds-back').addEventListener('click', () => this.show('main'));
+    $('btn-world-create').addEventListener('click', () => this._createWorld());
+    $('btn-world-cancel').addEventListener('click', () => this.show('worlds'));
 
     // ---- servers ----
-    $('btn-server-create').addEventListener('click', () => this._createServer());
+    $('btn-server-join').addEventListener('click', () => {
+      const s = this._servers.find((x) => x.id === this.selectedServer);
+      if (s) this.hooks.joinServer(s);
+    });
+    $('btn-server-refresh').addEventListener('click', () => this._renderServers());
+    $('btn-server-new').addEventListener('click', () => this.show('server-create'));
     $('btn-servers-back').addEventListener('click', () => this.show('main'));
+    $('btn-server-create').addEventListener('click', () => this._createServer());
+    $('btn-server-cancel').addEventListener('click', () => this.show('servers'));
 
     // ---- skin ----
     for (const part of ['head', 'body', 'arms', 'legs', 'eyes']) {
@@ -167,34 +211,31 @@ export class Menu {
     const list = $('world-list');
     list.innerHTML = '';
     const worlds = this.worlds();
+    this._syncWorldButtons();
     if (!worlds.length) {
-      list.innerHTML = '<div class="list-empty">No worlds yet — create one below.</div>';
+      list.innerHTML = '<div class="list-empty">No worlds yet.<br>Click "Create New World" to start.</div>';
       return;
     }
     for (const w of worlds) {
       const item = document.createElement('div');
-      item.className = 'list-item';
-      const label = document.createElement('div');
-      label.innerHTML = `<b>${escapeHtml(w.name)}</b>` +
-        `<span class="sub">${w.mode === 'creative' ? 'Creative' : 'Survival'}` +
-        `${w.cheats ? ' · cheats' : ''} · seed ${w.seed}</span>`;
-      const del = document.createElement('span');
-      del.className = 'del';
-      del.textContent = '✕';
-      del.title = 'Delete world';
-      del.addEventListener('click', (e) => {
-        e.stopPropagation();
-        if (confirm(`Delete world "${w.name}" forever?`)) {
-          localStorage.removeItem('vc_world_' + w.id);
-          this._saveWorlds(this.worlds().filter((x) => x.id !== w.id));
-          this._renderWorlds();
-        }
+      item.className = 'list-item' + (w.id === this.selectedWorld ? ' selected' : '');
+      item.innerHTML = `<div><b>${escapeHtml(w.name)}</b>` +
+        `<span class="sub">${w.mode === 'creative' ? 'Creative Mode' : 'Survival Mode'}` +
+        `${w.cheats ? ' · Cheats' : ''} · Seed: ${w.seed}</span></div>`;
+      // click selects (Minecraft-style); double-click plays
+      item.addEventListener('click', () => {
+        this.selectedWorld = w.id;
+        this._renderWorlds();
       });
-      item.appendChild(label);
-      item.appendChild(del);
-      item.addEventListener('click', () => this.hooks.startWorld(w));
+      item.addEventListener('dblclick', () => this.hooks.startWorld(w));
       list.appendChild(item);
     }
+  }
+
+  _syncWorldButtons() {
+    const has = !!this.selectedWorld;
+    $('btn-world-play').disabled = !has;
+    $('btn-world-delete').disabled = !has;
   }
 
   _createWorld() {
@@ -216,6 +257,10 @@ export class Menu {
     this.hooks.startWorld(meta);
   }
 
+  _syncServerButtons() {
+    $('btn-server-join').disabled = !this.selectedServer;
+  }
+
   // ---------------- multiplayer ----------------
 
   async _renderServers() {
@@ -235,36 +280,61 @@ export class Menu {
       status.className = 'menu-note err';
       return;
     }
-    status.textContent = servers.length ? `${servers.length} server(s) online` : '';
+    this._servers = servers;
+    this._syncServerButtons();
+    status.textContent = servers.length ? `${servers.length} server(s) found` : '';
     if (!servers.length) {
-      list.innerHTML = '<div class="list-empty">No servers yet — create the first one!</div>';
+      list.innerHTML = '<div class="list-empty">No servers yet.<br>Click "Create Server" to host the first one!</div>';
       return;
     }
     for (const s of servers) {
       const item = document.createElement('div');
-      item.className = 'list-item';
+      item.className = 'list-item' + (s.id === this.selectedServer ? ' selected' : '');
       item.innerHTML = `<div><b>${escapeHtml(s.name)}</b>` +
-        `<span class="sub">${s.mode === 'creative' ? 'Creative' : 'Survival'}` +
-        `${s.cheats ? ' · cheats for all' : ''} · by ${escapeHtml(s.creatorName || '?')}</span></div>` +
-        `<span>Join →</span>`;
-      item.addEventListener('click', () => this.hooks.joinServer(s));
+        `<span class="sub">${s.mode === 'creative' ? 'Creative Mode' : 'Survival Mode'}` +
+        `${s.cheats ? ' · Cheats for all' : ''} · by ${escapeHtml(s.creatorName || '?')}</span></div>` +
+        `<span class="online-dot">●</span>`;
+      item.addEventListener('click', () => {
+        this.selectedServer = s.id;
+        this._renderServersSelectionOnly();
+      });
+      item.addEventListener('dblclick', () => this.hooks.joinServer(s));
       list.appendChild(item);
     }
   }
 
+  /** Re-highlight selection without refetching from Firebase. */
+  _renderServersSelectionOnly() {
+    const list = $('server-list');
+    [...list.children].forEach((el, i) => {
+      const s = this._servers[i];
+      if (s) el.classList.toggle('selected', s.id === this.selectedServer);
+    });
+    this._syncServerButtons();
+  }
+
   async _createServer() {
     if (!this.net.available) return;
+    const status = $('server-create-status');
+    const btn = $('btn-server-create');
     const name = $('server-name').value.trim() || `${this.username}'s server`;
-    $('server-status').textContent = 'Creating server…';
+    btn.disabled = true;
+    status.textContent = 'Creating server…';
+    status.className = 'menu-note';
     const id = await this.net.createServer({
       name,
       mode: $('server-mode').value,
       cheats: $('server-cheats').checked,
       username: this.username,
     });
-    if (!id) { $('server-status').textContent = 'Failed to create server.'; return; }
+    btn.disabled = false;
+    if (!id) {
+      status.textContent = 'Failed — are the Firebase rules published? (see firebase-rules.md)';
+      status.className = 'menu-note err';
+      return;
+    }
     const servers = await this.net.listServers();
-    const mine = servers.find((s) => s.id === id);
+    const mine = (servers || []).find((s) => s.id === id);
     if (mine) this.hooks.joinServer(mine);
   }
 

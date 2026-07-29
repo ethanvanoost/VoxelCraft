@@ -244,6 +244,11 @@ function setMode(mode) {
   if (game) game.player.enabled = mode === 'playing';
   if (mode === 'playing') {
     menu.hide();
+    // Fullscreen while playing: this is the only state where the browser
+    // lets us capture Ctrl+W (Keyboard Lock API) — and it feels right anyway.
+    if (!document.fullscreenElement) {
+      try { document.documentElement.requestFullscreen()?.catch?.(() => {}); } catch { /* needs gesture */ }
+    }
     if (document.pointerLockElement !== renderer.domElement) {
       try { renderer.domElement.requestPointerLock()?.catch?.(() => {}); } catch { /* no gesture yet */ }
     }

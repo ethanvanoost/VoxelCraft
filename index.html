@@ -104,42 +104,72 @@
       </div>
     </div>
 
-    <!-- Singleplayer world list -->
+    <!-- Singleplayer: world select -->
     <div id="screen-worlds" class="screen hidden">
-      <div class="menu-label">Your Worlds</div>
+      <div class="menu-label">Select World</div>
       <div id="world-list" class="list"></div>
-      <div class="form-row">
-        <input id="world-name" class="mc-input" placeholder="New world name" maxlength="24">
-        <input id="world-seed" class="mc-input narrow" placeholder="Seed (optional)">
+      <div class="btn-row">
+        <button id="btn-world-play" class="mc-btn half" disabled>Play Selected World</button>
+        <button id="btn-world-new" class="mc-btn half">Create New World</button>
       </div>
-      <div class="form-row">
-        <select id="world-mode" class="mc-input narrow">
-          <option value="survival">Survival</option>
-          <option value="creative">Creative</option>
-        </select>
-        <label class="check"><input type="checkbox" id="world-cheats"> Allow cheats</label>
+      <div class="btn-row">
+        <button id="btn-world-delete" class="mc-btn half" disabled>Delete</button>
+        <button id="btn-worlds-back" class="mc-btn half">Back</button>
       </div>
-      <button id="btn-world-create" class="mc-btn">Create New World</button>
-      <button id="btn-worlds-back" class="mc-btn small">Back</button>
     </div>
 
-    <!-- Multiplayer server list -->
-    <div id="screen-servers" class="screen hidden">
-      <div class="menu-label">Multiplayer</div>
-      <div id="server-status" class="menu-note"></div>
-      <div id="server-list" class="list"></div>
-      <div class="form-row">
-        <input id="server-name" class="mc-input" placeholder="New server name" maxlength="24">
-      </div>
-      <div class="form-row">
-        <select id="server-mode" class="mc-input narrow">
+    <!-- Singleplayer: create world -->
+    <div id="screen-world-create" class="screen hidden">
+      <div class="menu-label">Create New World</div>
+      <div class="form-row"><label class="field-label">World Name</label>
+        <input id="world-name" class="mc-input" placeholder="New World" maxlength="24"></div>
+      <div class="form-row"><label class="field-label">Seed</label>
+        <input id="world-seed" class="mc-input" placeholder="Leave blank for random"></div>
+      <div class="form-row"><label class="field-label">Game Mode</label>
+        <select id="world-mode" class="mc-input">
           <option value="survival">Survival</option>
           <option value="creative">Creative</option>
-        </select>
-        <label class="check"><input type="checkbox" id="server-cheats"> Allow cheats for everyone</label>
+        </select></div>
+      <div class="form-row"><label class="field-label">Allow Cheats</label>
+        <label class="check"><input type="checkbox" id="world-cheats"> commands like /give, /tp</label></div>
+      <div class="btn-row">
+        <button id="btn-world-create" class="mc-btn half">Create New World</button>
+        <button id="btn-world-cancel" class="mc-btn half">Cancel</button>
       </div>
-      <button id="btn-server-create" class="mc-btn">Create Server</button>
-      <button id="btn-servers-back" class="mc-btn small">Back</button>
+    </div>
+
+    <!-- Multiplayer: server list -->
+    <div id="screen-servers" class="screen hidden">
+      <div class="menu-label">Play Multiplayer</div>
+      <div id="server-status" class="menu-note"></div>
+      <div id="server-list" class="list"></div>
+      <div class="btn-row">
+        <button id="btn-server-join" class="mc-btn half" disabled>Join Server</button>
+        <button id="btn-server-refresh" class="mc-btn half">Refresh</button>
+      </div>
+      <div class="btn-row">
+        <button id="btn-server-new" class="mc-btn half">Create Server</button>
+        <button id="btn-servers-back" class="mc-btn half">Back</button>
+      </div>
+    </div>
+
+    <!-- Multiplayer: create server -->
+    <div id="screen-server-create" class="screen hidden">
+      <div class="menu-label">Create Server</div>
+      <div class="form-row"><label class="field-label">Server Name</label>
+        <input id="server-name" class="mc-input" placeholder="My Server" maxlength="24"></div>
+      <div class="form-row"><label class="field-label">Game Mode</label>
+        <select id="server-mode" class="mc-input">
+          <option value="survival">Survival</option>
+          <option value="creative">Creative</option>
+        </select></div>
+      <div class="form-row"><label class="field-label">Allow Cheats</label>
+        <label class="check"><input type="checkbox" id="server-cheats"> for everyone (you always can)</label></div>
+      <div id="server-create-status" class="menu-note"></div>
+      <div class="btn-row">
+        <button id="btn-server-create" class="mc-btn half">Create Server</button>
+        <button id="btn-server-cancel" class="mc-btn half">Cancel</button>
+      </div>
     </div>
 
     <!-- Skin editor -->
