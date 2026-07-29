@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VoxelCraft</title>
+<link rel="stylesheet" href="css/style.css">
+<!-- Three.js via import map (only external dependency) -->
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js"
+  }
+}
+</script>
+</head>
+<body>
+
+<!-- 3D canvas is appended to #game by main.js -->
+<div id="game"></div>
+
+<!-- ======================= HUD ======================= -->
+<div id="hud">
+  <div id="crosshair">+</div>
+
+  <!-- Debug screen (F3) -->
+  <div id="debug" class="hidden">
+    <div id="debug-text"></div>
+  </div>
+
+  <!-- Top-left small info -->
+  <div id="info">
+    <div id="fps"></div>
+    <div id="coords"></div>
+  </div>
+
+  <!-- Health / hunger -->
+  <div id="status-bars">
+    <div id="health-bar" class="bar-row"></div>
+    <div id="hunger-bar" class="bar-row"></div>
+  </div>
+
+  <!-- Hotbar -->
+  <div id="hotbar"></div>
+  <div id="selected-block-name"></div>
+</div>
+
+<!-- ======================= Inventory ======================= -->
+<div id="inventory-screen" class="overlay hidden">
+  <div id="inventory-window">
+    <div class="inv-title">Crafting</div>
+    <div id="craft-area">
+      <div id="craft-grid"></div>
+      <div class="craft-arrow">&#10132;</div>
+      <div id="craft-result"></div>
+    </div>
+    <div class="inv-title">Inventory</div>
+    <div id="inventory-grid"></div>
+    <div id="inventory-hotbar" class="inv-hotbar"></div>
+  </div>
+</div>
+<div id="drag-item" class="hidden"></div>
+
+<!-- ======================= Chat / commands ======================= -->
+<div id="chat" class="hidden">
+  <input id="chat-input" type="text" autocomplete="off" spellcheck="false" placeholder="Type a command, e.g. /time set day">
+</div>
+<div id="chat-log"></div>
+
+<!-- ======================= Pause / Settings menu ======================= -->
+<div id="menu" class="overlay">
+  <div id="menu-window">
+    <h1 class="logo">VoxelCraft</h1>
+    <div id="menu-main">
+      <button id="btn-play" class="mc-btn">Play</button>
+      <button id="btn-settings" class="mc-btn">Settings</button>
+      <button id="btn-save" class="mc-btn">Save World</button>
+      <button id="btn-reset" class="mc-btn danger">Delete World &amp; New Seed</button>
+      <div class="menu-hint">
+        WASD move &middot; Space jump &middot; Ctrl sprint &middot; Shift crouch &middot; F fly<br>
+        LMB break &middot; RMB place/use &middot; E inventory &amp; crafting &middot; 1-9 / wheel select<br>
+        Punch trees for wood! &middot; F3 debug &middot; T commands &middot; Esc pause
+      </div>
+    </div>
+    <div id="menu-settings" class="hidden">
+      <div class="setting-row">
+        <label>Render Distance: <span id="val-render">6</span></label>
+        <input type="range" id="set-render" min="2" max="14" step="1" value="6">
+      </div>
+      <div class="setting-row">
+        <label>FOV: <span id="val-fov">75</span></label>
+        <input type="range" id="set-fov" min="50" max="110" step="1" value="75">
+      </div>
+      <div class="setting-row">
+        <label>Mouse Sensitivity: <span id="val-sens">1.0</span></label>
+        <input type="range" id="set-sens" min="0.2" max="3" step="0.1" value="1">
+      </div>
+      <div class="setting-row">
+        <label>Volume: <span id="val-volume">50</span>%</label>
+        <input type="range" id="set-volume" min="0" max="100" step="1" value="50">
+      </div>
+      <div class="setting-row">
+        <button id="btn-fullscreen" class="mc-btn small">Toggle Fullscreen</button>
+      </div>
+      <button id="btn-back" class="mc-btn">Done</button>
+    </div>
+  </div>
+</div>
+
+<!-- Boot guard: explain file:// problem and surface script errors visibly -->
+<div id="boot-error" style="display:none; position:fixed; inset:0; z-index:999; background:#1a1a2e; color:#fff;
+     font-family:'Courier New',monospace; padding:60px; line-height:1.8; font-size:16px;"></div>
+<script>
+  (function () {
+    var el = document.getElementById('boot-error');
+    function show(html) { el.innerHTML = html; el.style.display = 'block'; }
+    // FILE-GUARD-START (this block is stripped from the standalone build)
+    if (location.protocol === 'file:') {
+      // Browsers block module files on file:// — hop to the single-file build,
+      // which runs fine from a double-click.
+      location.replace('standalone.html');
+      return;
+    }
+    // FILE-GUARD-END
+    // Surface uncaught errors (e.g. CDN unreachable) instead of dead buttons
+    window.addEventListener('error', function (e) {
+      if (e.message) show('<h2>VoxelCraft failed to start</h2>' + e.message +
+        '<br><br>If this mentions "three", check your internet connection — Three.js loads from a CDN.');
+    });
+  })();
+</script>
+<script type="module" src="js/main.js"></script>
+</body>
+</html>

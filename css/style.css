@@ -1,0 +1,233 @@
+/* ============================================================
+   VoxelCraft — UI stylesheet (pixel-art / Minecraft-like HUD)
+   ============================================================ */
+
+@font-face {
+  /* Fallback chain gives a blocky look without shipping a font file */
+  font-family: 'PixelFallback';
+  src: local('Courier New');
+}
+
+:root {
+  --pixel-font: 'PixelFallback', 'Courier New', monospace;
+  --ui-bg: rgba(0, 0, 0, 0.55);
+  --slot-size: 48px;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; user-select: none; }
+
+html, body {
+  width: 100%; height: 100%;
+  overflow: hidden;
+  background: #000;
+  font-family: var(--pixel-font);
+  color: #fff;
+}
+
+#game, #game canvas {
+  position: absolute; inset: 0;
+  image-rendering: pixelated;
+}
+
+.hidden { display: none !important; }
+
+/* ---------------- HUD ---------------- */
+#hud { position: absolute; inset: 0; pointer-events: none; z-index: 10; }
+
+#crosshair {
+  position: absolute; left: 50%; top: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 24px; font-weight: bold;
+  color: rgba(255,255,255,0.85);
+  text-shadow: 1px 1px 0 rgba(0,0,0,0.5);
+}
+
+#info {
+  position: absolute; top: 8px; left: 8px;
+  font-size: 14px; line-height: 1.5;
+  text-shadow: 2px 2px 0 rgba(0,0,0,0.6);
+}
+
+#debug {
+  position: absolute; top: 8px; left: 8px;
+  background: var(--ui-bg);
+  padding: 8px 10px;
+  font-size: 13px; line-height: 1.45;
+  white-space: pre;
+  z-index: 20;
+}
+
+/* ---------------- Health / hunger ---------------- */
+#status-bars {
+  position: absolute; bottom: 76px; left: 50%;
+  transform: translateX(-50%);
+  width: 460px;
+  display: flex; justify-content: space-between;
+}
+.bar-row { display: flex; gap: 2px; }
+.heart, .drumstick {
+  width: 18px; height: 18px;
+  image-rendering: pixelated;
+  font-size: 16px; line-height: 18px; text-align: center;
+  text-shadow: 1px 1px 0 rgba(0,0,0,0.7);
+}
+.heart.empty, .drumstick.empty { filter: grayscale(1) brightness(0.4); }
+.heart.half { filter: brightness(0.75); }
+
+/* ---------------- Hotbar ---------------- */
+#hotbar {
+  position: absolute; bottom: 12px; left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  background: rgba(0,0,0,0.45);
+  border: 3px solid #2a2a2a;
+  padding: 3px;
+}
+.slot {
+  width: var(--slot-size); height: var(--slot-size);
+  border: 3px solid #555;
+  background: rgba(60,60,60,0.6);
+  position: relative;
+  pointer-events: auto;
+}
+.slot.selected { border-color: #fff; }
+.slot canvas {
+  width: 100%; height: 100%;
+  image-rendering: pixelated;
+}
+.slot .count {
+  position: absolute; right: 3px; bottom: 1px;
+  font-size: 14px; font-weight: bold;
+  color: #fff;
+  text-shadow: 2px 2px 0 #000;
+  pointer-events: none;
+}
+
+#selected-block-name {
+  position: absolute; bottom: 108px; left: 50%;
+  transform: translateX(-50%);
+  font-size: 16px;
+  text-shadow: 2px 2px 0 rgba(0,0,0,0.7);
+  transition: opacity 1s;
+}
+
+/* ---------------- Inventory ---------------- */
+.overlay {
+  position: absolute; inset: 0;
+  background: rgba(0,0,0,0.5);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 50;
+}
+#inventory-window {
+  background: #c6c6c6;
+  border: 4px solid;
+  border-color: #fff #555 #555 #fff;
+  padding: 14px;
+  color: #3f3f3f;
+}
+.inv-title { font-size: 15px; margin-bottom: 8px; font-weight: bold; }
+#craft-area {
+  display: flex; align-items: center; gap: 14px;
+  margin-bottom: 14px;
+}
+#craft-grid {
+  display: grid;
+  grid-template-columns: repeat(2, var(--slot-size));
+  gap: 2px;
+}
+.craft-arrow { font-size: 30px; color: #555; }
+#craft-result .slot {
+  border-width: 3px;
+}
+#inventory-grid {
+  display: grid;
+  grid-template-columns: repeat(9, var(--slot-size));
+  gap: 2px;
+  margin-bottom: 12px;
+}
+.inv-hotbar {
+  display: grid;
+  grid-template-columns: repeat(9, var(--slot-size));
+  gap: 2px;
+}
+#inventory-window .slot {
+  border: 2px solid;
+  border-color: #373737 #fff #fff #373737;
+  background: #8b8b8b;
+}
+#drag-item {
+  position: fixed; z-index: 100;
+  width: var(--slot-size); height: var(--slot-size);
+  pointer-events: none;
+}
+#drag-item canvas { width: 100%; height: 100%; image-rendering: pixelated; }
+#drag-item .count {
+  position: absolute; right: 3px; bottom: 1px;
+  font-size: 14px; font-weight: bold; color: #fff;
+  text-shadow: 2px 2px 0 #000;
+}
+
+/* ---------------- Chat ---------------- */
+#chat {
+  position: absolute; bottom: 90px; left: 8px;
+  width: 480px; z-index: 60;
+}
+#chat-input {
+  width: 100%;
+  background: rgba(0,0,0,0.6);
+  border: 2px solid #888;
+  color: #fff;
+  font-family: var(--pixel-font);
+  font-size: 15px;
+  padding: 6px 8px;
+  outline: none;
+}
+#chat-log {
+  position: absolute; bottom: 130px; left: 8px;
+  width: 480px;
+  font-size: 14px; line-height: 1.5;
+  text-shadow: 1px 1px 0 #000;
+  z-index: 15;
+  pointer-events: none;
+}
+#chat-log .msg {
+  background: rgba(0,0,0,0.35);
+  padding: 1px 6px; margin-top: 2px;
+}
+
+/* ---------------- Menu ---------------- */
+#menu { background: rgba(10, 10, 30, 0.75); }
+#menu-window { text-align: center; }
+.logo {
+  font-size: 56px;
+  letter-spacing: 4px;
+  color: #fff;
+  text-shadow: 4px 4px 0 #3f3f3f;
+  margin-bottom: 30px;
+}
+.mc-btn {
+  display: block;
+  width: 320px;
+  margin: 8px auto;
+  padding: 12px;
+  font-family: var(--pixel-font);
+  font-size: 17px;
+  color: #fff;
+  background: #6d6d6d;
+  border: 3px solid;
+  border-color: #aaa #333 #333 #aaa;
+  cursor: pointer;
+  text-shadow: 2px 2px 0 rgba(0,0,0,0.5);
+}
+.mc-btn:hover { background: #7d8bc7; }
+.mc-btn.small { width: 220px; padding: 8px; font-size: 14px; margin: 0 auto; }
+.mc-btn.danger:hover { background: #c75b5b; }
+.menu-hint {
+  margin-top: 24px;
+  font-size: 13px; line-height: 1.7;
+  color: #ccc;
+  text-shadow: 1px 1px 0 #000;
+}
+.setting-row { margin: 14px 0; width: 340px; text-align: left; }
+.setting-row label { display: block; font-size: 14px; margin-bottom: 4px; }
+.setting-row input[type=range] { width: 100%; }
