@@ -40,6 +40,7 @@ export class Inventory {
     this.onChestChange = null;   // callback after any chest slot changes
     /** Open furnace: reference to {slots:[in,fuel,out], progress, burn}. */
     this.furnace = null;
+    this.onFurnaceChange = null;  // multiplayer sync hook
     this.creativeMode = false;
 
     this._iconCache = new Map();
@@ -197,6 +198,7 @@ export class Inventory {
     if (--this.dragging.count <= 0) this.dragging = null;
     if (isCraft) this._updateResult();
     if (isChest) this.onChestChange?.();
+    if (isFurnace) this.onFurnaceChange?.();
     this.audio?.play('click');
     this.renderAll();
   }
@@ -229,6 +231,7 @@ export class Inventory {
         this.dragging.count += out.count;
         this.furnace.slots[2] = null;
       } else return;
+      this.onFurnaceChange?.();
       this.audio?.play('click');
       this.renderAll();
       return;
@@ -281,6 +284,7 @@ export class Inventory {
     }
     if (isCraft) this._updateResult();
     if (isChest) this.onChestChange?.();
+    if (isFurnace) this.onFurnaceChange?.();
     this.audio?.play('click');
     this.renderAll();
   }
@@ -383,6 +387,7 @@ export class Inventory {
       this.chest = null;
       this.onChestChange = null;
       this.furnace = null;
+      this.onFurnaceChange = null;
     }
     this.renderAll();
     return this.open;

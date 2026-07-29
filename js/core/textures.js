@@ -321,6 +321,29 @@ PAINTERS.diamond_item = (ctx, x, y) => {
   ctx.fillRect(x + 6, y + 5, 2, 2);          // sparkle
 };
 
+PAINTERS.wool = (ctx, x, y) => {
+  noisyFill(ctx, x, y, [235, 235, 235], 12, 160);
+  speckle(ctx, x, y, 'rgb(210,210,210)', 20, 161, 2);
+  speckle(ctx, x, y, 'rgb(250,250,250)', 14, 162);
+};
+PAINTERS.bed_top = (ctx, x, y) => {
+  // red blanket with a white pillow end
+  noisyFill(ctx, x, y, [170, 40, 40], 10, 163);
+  ctx.fillStyle = 'rgb(235,235,235)';
+  ctx.fillRect(x + 1, y + 1, 14, 4);          // pillow
+  ctx.fillStyle = 'rgb(200,200,200)';
+  ctx.fillRect(x + 1, y + 4, 14, 1);
+  ctx.fillStyle = 'rgb(140,30,30)';
+  ctx.fillRect(x + 1, y + 6, 14, 1);          // blanket fold
+};
+PAINTERS.bed_side = (ctx, x, y) => {
+  noisyFill(ctx, x, y, [170, 40, 40], 10, 164);
+  ctx.fillStyle = 'rgb(120,90,55)';
+  ctx.fillRect(x, y + 10, TILE, 6);           // wooden frame
+  ctx.fillStyle = 'rgb(96,70,40)';
+  ctx.fillRect(x, y + 10, TILE, 1);
+};
+
 // ---- Food sprites ----
 function meatPainter(rawR, rawG, rawB, cooked) {
   return (ctx, x, y) => {

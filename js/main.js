@@ -64,13 +64,15 @@ const settings = new Settings({
   volume: (v) => { audio.setVolume(v / 100); },
 });
 
-// ---------------------------------------------------------------- Chest sync helpers
+// ---------------------------------------------------------------- Chest/furnace sync helpers
 const packChest = (slots) => slots.map((s) => (s ? { i: s.id, c: s.count } : 0));
-const unpackChest = (arr) => {
-  const out = new Array(27).fill(null);
-  if (arr) for (let i = 0; i < 27; i++) { const v = arr[i]; if (v && v.i) out[i] = { id: v.i, count: v.c || 1 }; }
+const unpackChest = (arr, size = 27) => {
+  const out = new Array(size).fill(null);
+  if (arr) for (let i = 0; i < size; i++) { const v = arr[i]; if (v && v.i) out[i] = { id: v.i, count: v.c || 1 }; }
   return out;
 };
+const packFurnace = (f) => ({ s: packChest(f.slots), p: Math.round(f.progress * 10) / 10, b: Math.round(f.burn) });
+const unpackFurnace = (v) => ({ slots: unpackChest(v?.s, 3), progress: v?.p || 0, burn: v?.b || 0 });
 
 // ---------------------------------------------------------------- Game lifecycle
 async function startGame(opts) {
@@ -120,7 +122,8 @@ async function startGame(opts) {
   const saved = SaveSystem.peek(saveKey);
   if (saved && (!saved.seed || saved.seed === seed)) saveSystem.restore(saved);
   else {
-    // Spiral out from the origin until we find dry land to spawn on
+    // Spiral out from the origin until we find dry land to spawn on —
+    // skipping columns where a cave/ravine has carved away the surface
     let sx = 0, sz = 0;
     outer:
     for (let r = 0; r < 64; r++) {
@@ -128,7 +131,11 @@ async function startGame(opts) {
         const ang = (a / Math.max(1, r * 6)) * Math.PI * 2;
         const x = Math.round(Math.cos(ang) * r * 8);
         const z = Math.round(Math.sin(ang) * r * 8);
-        if (world.gen.column(x, z).height > CONFIG.SEA_LEVEL + 1) { sx = x; sz = z; break outer; }
+        const h = world.gen.column(x, z).height;
+        if (h > CONFIG.SEA_LEVEL + 1 &&
+            !world.gen.isCave(x, h, z) && !world.gen.isCave(x, h - 1, z) && !world.gen.isCave(x, h - 2, z)) {
+          sx = x; sz = z; break outer;
+        }
       }
     }
     player.position.set(sx + 0.5, world.surfaceHeight(sx, sz) + 2, sz + 0.5);
@@ -154,8 +161,20 @@ async function startGame(opts) {
     }
     if (blockId === BLOCK.FURNACE) {
       const p = interaction.target.pos;
-      inventory.openFurnace(world.getFurnace(`${p.x},${p.y},${p.z}`));
+      const key = `${p.x},${p.y},${p.z}`;
+      game.openFurnaceKey = key;
+      inventory.openFurnace(world.getFurnace(key));
+      inventory.onFurnaceChange = () => game.session?.setFurnace(key, packFurnace(world.getFurnace(key)));
       setMode('inventory');
+      return true;
+    }
+    if (blockId === BLOCK.BED) {
+      if (sky.daylight < 0.15) {
+        sky.time = 0.01;   // sunrise
+        commands.print('You sleep through the night... good morning!');
+      } else {
+        commands.print('You can only sleep at night.');
+      }
       return true;
     }
     return false;
@@ -210,6 +229,22 @@ async function startGame(opts) {
           }
         }
         if (game.inventory.open && game.inventory.chest) game.inventory.renderAll();
+      },
+      onFurnaces(all) {
+        for (const [key, packed] of Object.entries(all)) {
+          const fresh = unpackFurnace(packed);
+          const existing = game.world.furnaces[key];
+          if (existing) {   // update in place so an open furnace UI stays live
+            existing.slots[0] = fresh.slots[0];
+            existing.slots[1] = fresh.slots[1];
+            existing.slots[2] = fresh.slots[2];
+            existing.progress = fresh.progress;
+            existing.burn = fresh.burn;
+          } else {
+            game.world.furnaces[key] = fresh;
+          }
+        }
+        if (game.inventory.open && game.inventory.furnace) game.inventory.renderAll();
       },
       onChat(m) { game.commands.print(`<${m.name}> ${m.text}`); },
     });
@@ -374,12 +409,17 @@ function frame() {
     player.update(dt);
     interaction.update(dt);
     world.update(player.position);
+    world.updateWater(dt);
     sky.update(dt, player.position, world.renderDistance);
     saveSystem.update(dt);
     game.drops.update(dt, player, game.inventory);
-    game.mobs.update(dt, player.position);
-    if (world.tickFurnaces(dt) && game.inventory.open && game.inventory.furnace) {
-      game.inventory.renderAll();
+    game.mobs.update(dt, player, sky.daylight);
+    if (world.tickFurnaces(dt)) {
+      if (game.inventory.open && game.inventory.furnace) game.inventory.renderAll();
+      // Multiplayer: sync the furnace you have open (its state just changed)
+      if (game.session && game.openFurnaceKey && world.furnaces[game.openFurnaceKey]) {
+        game.session.setFurnace(game.openFurnaceKey, packFurnace(world.furnaces[game.openFurnaceKey]));
+      }
     }
     game.inventory.updateFurnaceView();
 

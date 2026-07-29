@@ -40,6 +40,16 @@ export class HUD {
       d.className = 'drumstick'; d.textContent = '🍗';
       this.els.hunger.appendChild(d);
     }
+    // Air bubbles: appear above the hunger bar while underwater
+    this.els.air = document.createElement('div');
+    this.els.air.id = 'air-bar';
+    this.els.air.className = 'bar-row';
+    for (let i = 0; i < 10; i++) {
+      const b = document.createElement('div');
+      b.className = 'bubble'; b.textContent = '●';
+      this.els.air.appendChild(b);
+    }
+    document.getElementById('status-bars').appendChild(this.els.air);
   }
 
   toggleDebug() {
@@ -82,6 +92,17 @@ export class HUD {
       this.els.fps.textContent = `FPS: ${this.fps}`;
       this.els.coords.textContent =
         `XYZ: ${p.x.toFixed(1)} ${p.y.toFixed(1)} ${p.z.toFixed(1)}  |  Chunk: ${cx},${cz}`;
+    }
+
+    // ---- Air bubbles (only while holding breath) ----
+    const underwater = this.player.headInWater || (this.player.airTimer || 0) > 0;
+    this.els.air.style.display = underwater && !this.player.creative ? 'flex' : 'none';
+    if (underwater) {
+      const frac = Math.max(0, 1 - (this.player.airTimer || 0) / (this.player.maxAir || 12));
+      const bubbles = Math.ceil(frac * 10);
+      [...this.els.air.children].forEach((el, i) => {
+        el.className = 'bubble' + (i < bubbles ? '' : ' empty');
+      });
     }
 
     // ---- Health / hunger ----

@@ -229,12 +229,17 @@ export class Player {
       this.hungerTimer = 0;
     }
 
-    // ---- Drowning ----
+    // ---- Drowning (12 s of air, then 1 heart per second) ----
+    this.maxAir = 12;
     if (this.headInWater && !this.flying && !this.creative) {
       this.airTimer = (this.airTimer || 0) + dt;
-      if (this.airTimer > 12 && this.hungerTimer === 0) this.damage(2);
+      if (this.airTimer > this.maxAir) {
+        this._drownTick = (this._drownTick || 0) + dt;
+        if (this._drownTick >= 1) { this._drownTick = 0; this.damage(2); }
+      }
     } else {
       this.airTimer = 0;
+      this._drownTick = 0;
     }
 
     // ---- Camera ----

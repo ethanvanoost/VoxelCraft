@@ -38,6 +38,8 @@ export const BLOCK = {
   IRON_BLOCK: 25,
   GOLD_BLOCK: 26,
   DIAMOND_BLOCK: 27,
+  WOOL: 28,
+  BED: 29,
 };
 
 /**
@@ -90,6 +92,8 @@ export const BLOCK_DEFS = {
   [BLOCK.IRON_BLOCK]: { name: 'Block of Iron', tex: { all: 'iron_block' }, solid: true, opaque: true, hardness: 5, sound: 'stone' },
   [BLOCK.GOLD_BLOCK]: { name: 'Block of Gold', tex: { all: 'gold_block' }, solid: true, opaque: true, hardness: 3, sound: 'stone' },
   [BLOCK.DIAMOND_BLOCK]: { name: 'Block of Diamond', tex: { all: 'diamond_block' }, solid: true, opaque: true, hardness: 5, sound: 'stone' },
+  [BLOCK.WOOL]: { name: 'Wool', tex: { all: 'wool' }, solid: true, opaque: true, hardness: 0.4, sound: 'grass' },
+  [BLOCK.BED]:  { name: 'Bed', tex: { top: 'bed_top', bottom: 'planks', side: 'bed_side' }, solid: true, opaque: true, hardness: 0.3, sound: 'wood' },
 };
 
 /**

@@ -65,6 +65,11 @@ servers/<serverId>/chat/<pushId>     { name, text, ts }
           "$pos": { ".write": "auth != null" }
         },
 
+        "furnaces": {
+          // shared furnaces: anyone can load fuel/input and take output
+          "$pos": { ".write": "auth != null" }
+        },
+
         "chat": {
           "$msgId": {
             // create new messages; anyone may DELETE a message once it is

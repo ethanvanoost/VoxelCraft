@@ -134,6 +134,11 @@ export class Net {
       snap.forEach((s) => { all[s.key] = s.val(); });
       callbacks.onChests(all);
     }));
+    unsubs.push(f.onValue(this._ref(`${base}/furnaces`), (snap) => {
+      const all = {};
+      snap.forEach((s) => { all[s.key] = s.val(); });
+      callbacks.onFurnaces?.(all);
+    }));
     // Chat: show live messages; delete anything older than 5 minutes
     // (rules allow removing only expired messages, so any client can clean up)
     const CHAT_TTL = 5 * 60 * 1000;
@@ -164,6 +169,9 @@ export class Net {
       sendEdit(posKey, id) { f.set(net._ref(`${base}/edits/${posKey}`), id).catch(() => {}); },
       setChest(posKey, slots) {
         f.set(net._ref(`${base}/chests/${posKey}`), slots ?? null).catch(() => {});
+      },
+      setFurnace(posKey, state) {
+        f.set(net._ref(`${base}/furnaces/${posKey}`), state ?? null).catch(() => {});
       },
       sendChat(name, text) {
         f.push(net._ref(`${base}/chat`), { name, text: String(text).slice(0, 200), ts: Date.now() })

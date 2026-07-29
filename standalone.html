@@ -80,6 +80,18 @@ html, body {
 }
 .heart.empty, .drumstick.empty { filter: grayscale(1) brightness(0.4); }
 .heart.half { filter: brightness(0.75); }
+#air-bar {
+  position: absolute;
+  right: 0; bottom: 24px;
+  display: none;
+}
+.bubble {
+  width: 18px; height: 18px;
+  font-size: 15px; line-height: 18px; text-align: center;
+  color: #8fd8ff;
+  text-shadow: 1px 1px 0 rgba(0,0,0,0.7);
+}
+.bubble.empty { opacity: 0.15; }
 
 /* ---------------- Hotbar ---------------- */
 #hotbar {
@@ -821,6 +833,8 @@ const BLOCK = {
   IRON_BLOCK: 25,
   GOLD_BLOCK: 26,
   DIAMOND_BLOCK: 27,
+  WOOL: 28,
+  BED: 29,
 };
 
 /**
@@ -873,6 +887,8 @@ const BLOCK_DEFS = {
   [BLOCK.IRON_BLOCK]: { name: 'Block of Iron', tex: { all: 'iron_block' }, solid: true, opaque: true, hardness: 5, sound: 'stone' },
   [BLOCK.GOLD_BLOCK]: { name: 'Block of Gold', tex: { all: 'gold_block' }, solid: true, opaque: true, hardness: 3, sound: 'stone' },
   [BLOCK.DIAMOND_BLOCK]: { name: 'Block of Diamond', tex: { all: 'diamond_block' }, solid: true, opaque: true, hardness: 5, sound: 'stone' },
+  [BLOCK.WOOL]: { name: 'Wool', tex: { all: 'wool' }, solid: true, opaque: true, hardness: 0.4, sound: 'grass' },
+  [BLOCK.BED]:  { name: 'Bed', tex: { top: 'bed_top', bottom: 'planks', side: 'bed_side' }, solid: true, opaque: true, hardness: 0.3, sound: 'wood' },
 };
 
 /**
@@ -1324,6 +1340,29 @@ PAINTERS.diamond_item = (ctx, x, y) => {
   ctx.fillRect(x + 6, y + 5, 2, 2);          // sparkle
 };
 
+PAINTERS.wool = (ctx, x, y) => {
+  noisyFill(ctx, x, y, [235, 235, 235], 12, 160);
+  speckle(ctx, x, y, 'rgb(210,210,210)', 20, 161, 2);
+  speckle(ctx, x, y, 'rgb(250,250,250)', 14, 162);
+};
+PAINTERS.bed_top = (ctx, x, y) => {
+  // red blanket with a white pillow end
+  noisyFill(ctx, x, y, [170, 40, 40], 10, 163);
+  ctx.fillStyle = 'rgb(235,235,235)';
+  ctx.fillRect(x + 1, y + 1, 14, 4);          // pillow
+  ctx.fillStyle = 'rgb(200,200,200)';
+  ctx.fillRect(x + 1, y + 4, 14, 1);
+  ctx.fillStyle = 'rgb(140,30,30)';
+  ctx.fillRect(x + 1, y + 6, 14, 1);          // blanket fold
+};
+PAINTERS.bed_side = (ctx, x, y) => {
+  noisyFill(ctx, x, y, [170, 40, 40], 10, 164);
+  ctx.fillStyle = 'rgb(120,90,55)';
+  ctx.fillRect(x, y + 10, TILE, 6);           // wooden frame
+  ctx.fillStyle = 'rgb(96,70,40)';
+  ctx.fillRect(x, y + 10, TILE, 1);
+};
+
 // ---- Food sprites ----
 function meatPainter(rawR, rawG, rawB, cooked) {
   return (ctx, x, y) => {
@@ -1548,7 +1587,7 @@ function buildAtlas() {
 
 
 var { LOG, PLANKS, SAND, SANDSTONE, STONE, STONE_BRICKS, COBBLESTONE,
-        CRAFTING_TABLE, FURNACE, CHEST,
+        CRAFTING_TABLE, FURNACE, CHEST, WOOL, BED,
         COAL_BLOCK, IRON_BLOCK, GOLD_BLOCK, DIAMOND_BLOCK } = BLOCK;
 const { STICK, COAL, IRON_INGOT, GOLD_INGOT, DIAMOND } = ITEM;
 
@@ -1596,6 +1635,12 @@ const RECIPES = [
     ], result: { id: FURNACE, count: 1 } },
   { shape: [[STONE, STONE], [STONE, STONE]], result: { id: STONE_BRICKS, count: 4 } },
   { shape: [[SAND, SAND], [SAND, SAND]], result: { id: SANDSTONE, count: 1 } },
+
+  // Bed — authentic recipe: 3 wool over 3 planks (needs a crafting table)
+  { shape: [
+      [WOOL, WOOL, WOOL],
+      [PLANKS, PLANKS, PLANKS],
+    ], result: { id: BED, count: 1 } },
 
   // ---------------- Mineral storage blocks (9 ↔ block) ----------------
   { shape: fill3x3(COAL), result: { id: COAL_BLOCK, count: 1 } },
@@ -2134,6 +2179,11 @@ class World {
     this.edits = {};                  // "x,y,z" -> block id (player modifications)
     this.chests = {};                 // "x,y,z" -> array(27) of {id,count}|null
     this.furnaces = {};               // "x,y,z" -> {slots:[in,fuel,out], progress, burn}
+
+    // ---- Flowing water ----
+    this.waterQueue = new Set();      // posKeys of water blocks to update
+    this.waterLevels = {};            // posKey -> spread level (7 = source)
+    this._waterTimer = 0;
     this.onEdit = null;               // hook: (x, y, z, id) after a player edit (multiplayer sync)
     this.renderDistance = CONFIG.RENDER_DISTANCE;
     this.genQueue = [];               // chunks waiting for generation+mesh
@@ -2183,6 +2233,14 @@ class World {
     if (record) {
       this.edits[`${x},${y},${z}`] = id;
       this.onEdit?.(x, y, z, id);
+    }
+
+    // Wake up water: this block and any water neighbors may need to flow
+    if (id === BLOCK.WATER) this.waterQueue.add(`${x},${y},${z}`);
+    for (const [dx, dy, dz] of [[1,0,0],[-1,0,0],[0,0,1],[0,0,-1],[0,1,0]]) {
+      if (this.getBlock(x + dx, y + dy, z + dz) === BLOCK.WATER) {
+        this.waterQueue.add(`${x + dx},${y + dy},${z + dz}`);
+      }
     }
 
     // Neighbor chunks need remeshing if the edit touches their border
@@ -2334,6 +2392,44 @@ class World {
       chunk.meshes = null;
     }
     if (!keepData) chunk.generated = false;
+  }
+
+  /**
+   * Flowing water: every 0.25 s, queued water blocks fall into air below or
+   * spread sideways with a decreasing level (source = 7), Minecraft-style.
+   * Natural ocean/river water counts as a source.
+   */
+  updateWater(dt) {
+    this._waterTimer += dt;
+    if (this._waterTimer < 0.25 || this.waterQueue.size === 0) return;
+    this._waterTimer = 0;
+
+    const batch = [...this.waterQueue].slice(0, 120);
+    for (const key of batch) {
+      this.waterQueue.delete(key);
+      const [x, y, z] = key.split(',').map(Number);
+      if (this.getBlock(x, y, z) !== BLOCK.WATER) continue;
+      const level = this.waterLevels[key] ?? 7;
+
+      // Fall straight down first (falling water is always "full strength")
+      if (this.getBlock(x, y - 1, z) === BLOCK.AIR) {
+        const below = `${x},${y - 1},${z}`;
+        this.waterLevels[below] = 7;
+        this.setBlock(x, y - 1, z, BLOCK.WATER);
+        continue;
+      }
+
+      // Otherwise spread sideways, weakening with distance
+      if (level > 1) {
+        for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+          if (this.getBlock(x + dx, y, z + dz) === BLOCK.AIR) {
+            const nKey = `${x + dx},${y},${z + dz}`;
+            this.waterLevels[nKey] = level - 1;
+            this.setBlock(x + dx, y, z + dz, BLOCK.WATER);
+          }
+        }
+      }
+    }
   }
 
   /** Furnace state at a position (created on first open). */
@@ -2559,6 +2655,11 @@ class Net {
       snap.forEach((s) => { all[s.key] = s.val(); });
       callbacks.onChests(all);
     }));
+    unsubs.push(f.onValue(this._ref(`${base}/furnaces`), (snap) => {
+      const all = {};
+      snap.forEach((s) => { all[s.key] = s.val(); });
+      callbacks.onFurnaces?.(all);
+    }));
     // Chat: show live messages; delete anything older than 5 minutes
     // (rules allow removing only expired messages, so any client can clean up)
     const CHAT_TTL = 5 * 60 * 1000;
@@ -2589,6 +2690,9 @@ class Net {
       sendEdit(posKey, id) { f.set(net._ref(`${base}/edits/${posKey}`), id).catch(() => {}); },
       setChest(posKey, slots) {
         f.set(net._ref(`${base}/chests/${posKey}`), slots ?? null).catch(() => {});
+      },
+      setFurnace(posKey, state) {
+        f.set(net._ref(`${base}/furnaces/${posKey}`), state ?? null).catch(() => {});
       },
       sendChat(name, text) {
         f.push(net._ref(`${base}/chat`), { name, text: String(text).slice(0, 200), ts: Date.now() })
@@ -2763,9 +2867,26 @@ const MOB_TYPES = {
     body: 0x6b4a33, snout: 0xcfc5bb, health: 12, scale: 1.15,
     drop: ITEM.RAW_BEEF,
   },
+  sheep: {
+    body: 0xe8e8e8, snout: 0xd9b8a6, health: 8, scale: 1.05,
+    drop: BLOCK.WOOL,
+  },
+  zombie: {
+    body: 0x3f8f3f, snout: 0x2f6f2f, health: 20, scale: 1,
+    humanoid: true, hostile: true, dmg: 3, speed: 1.7,
+    drop: null,
+  },
+  skeleton: {
+    body: 0xd6d6d6, snout: 0xb8b8b8, health: 14, scale: 0.95,
+    humanoid: true, hostile: true, dmg: 2, speed: 2.1,
+    drop: ITEM.STICK,        // bones, basically
+  },
 };
 
-const MAX_MOBS = 10;
+const PASSIVE = ['pig', 'cow', 'sheep'];
+const HOSTILE = ['zombie', 'skeleton'];
+const MAX_PASSIVE = 10;
+const MAX_HOSTILE = 6;
 const SPAWN_MIN = 20, SPAWN_MAX = 44;
 const DESPAWN_DIST = 70;
 
@@ -2788,27 +2909,53 @@ class Mob {
     const g = new THREE.Group();
     this.bodyMat = new THREE.MeshLambertMaterial({ color: def.body });
     const snoutMat = new THREE.MeshLambertMaterial({ color: def.snout });
-    const body = new THREE.Mesh(new THREE.BoxGeometry(0.7 * s, 0.55 * s, 1.1 * s), this.bodyMat);
-    body.position.y = 0.65 * s;
-    const head = new THREE.Mesh(new THREE.BoxGeometry(0.5 * s, 0.5 * s, 0.45 * s), this.bodyMat);
-    head.position.set(0, 0.85 * s, 0.7 * s);
-    const snout = new THREE.Mesh(new THREE.BoxGeometry(0.24 * s, 0.16 * s, 0.1 * s), snoutMat);
-    snout.position.set(0, 0.78 * s, 0.94 * s);
     this.legs = [];
-    for (const [lx, lz] of [[-0.22, 0.35], [0.22, 0.35], [-0.22, -0.35], [0.22, -0.35]]) {
-      const leg = new THREE.Mesh(new THREE.BoxGeometry(0.18 * s, 0.4 * s, 0.18 * s), this.bodyMat);
-      leg.position.set(lx * s, 0.2 * s, lz * s);
-      this.legs.push(leg);
-      g.add(leg);
+
+    if (def.humanoid) {
+      // Zombie / skeleton: upright, player-like proportions
+      const w = type === 'skeleton' ? 0.7 : 1;   // skeletons are bony
+      const head = new THREE.Mesh(new THREE.BoxGeometry(0.5 * s, 0.5 * s, 0.5 * s), this.bodyMat);
+      head.position.y = 1.55 * s;
+      const body = new THREE.Mesh(new THREE.BoxGeometry(0.5 * s * w, 0.7 * s, 0.26 * s * w), this.bodyMat);
+      body.position.y = 0.95 * s;
+      // arms stretched forward, classic zombie pose
+      for (const lx of [-0.36, 0.36]) {
+        const arm = new THREE.Mesh(new THREE.BoxGeometry(0.16 * s, 0.16 * s, 0.7 * s), snoutMat);
+        arm.position.set(lx * s * w, 1.2 * s, 0.35 * s);
+        g.add(arm);
+      }
+      for (const lx of [-0.12, 0.12]) {
+        const leg = new THREE.Mesh(new THREE.BoxGeometry(0.2 * s * w, 0.75 * s, 0.2 * s * w), this.bodyMat);
+        leg.position.set(lx * s, 0.375 * s, 0);
+        this.legs.push(leg);
+        g.add(leg);
+      }
+      // dummy entries so the 4-leg animation code works unchanged
+      this.legs.push(this.legs[0], this.legs[1]);
+      g.add(head, body);
+    } else {
+      const body = new THREE.Mesh(new THREE.BoxGeometry(0.7 * s, 0.55 * s, 1.1 * s), this.bodyMat);
+      body.position.y = 0.65 * s;
+      const head = new THREE.Mesh(new THREE.BoxGeometry(0.5 * s, 0.5 * s, 0.45 * s), this.bodyMat);
+      head.position.set(0, 0.85 * s, 0.7 * s);
+      const snout = new THREE.Mesh(new THREE.BoxGeometry(0.24 * s, 0.16 * s, 0.1 * s), snoutMat);
+      snout.position.set(0, 0.78 * s, 0.94 * s);
+      for (const [lx, lz] of [[-0.22, 0.35], [0.22, 0.35], [-0.22, -0.35], [0.22, -0.35]]) {
+        const leg = new THREE.Mesh(new THREE.BoxGeometry(0.18 * s, 0.4 * s, 0.18 * s), this.bodyMat);
+        leg.position.set(lx * s, 0.2 * s, lz * s);
+        this.legs.push(leg);
+        g.add(leg);
+      }
+      g.add(body, head, snout);
     }
-    g.add(body, head, snout);
     g.traverse((o) => { if (o.isMesh) o.castShadow = true; });
     this.group = g;
+    this.attackCooldown = 0;
   }
 
   /** AABB half-extents for collision & hit detection. */
-  get halfW() { return 0.4 * this.def.scale; }
-  get height() { return 0.95 * this.def.scale; }
+  get halfW() { return (this.def.humanoid ? 0.32 : 0.4) * this.def.scale; }
+  get height() { return (this.def.humanoid ? 1.85 : 0.95) * this.def.scale; }
 
   collides(world, p) {
     const hw = this.halfW;
@@ -2820,18 +2967,28 @@ class Mob {
     return false;
   }
 
-  update(dt, world) {
-    // ---- Wander AI ----
-    this.aiTimer -= dt;
-    if (this.aiTimer <= 0) {
-      this.aiTimer = 1.5 + Math.random() * 3.5;
-      this.moving = Math.random() < 0.6;
-      this.yaw += (Math.random() - 0.5) * Math.PI * 1.5;
+  update(dt, world, playerPos) {
+    this.attackCooldown = Math.max(0, this.attackCooldown - dt);
+
+    // ---- AI: hostiles chase the player, everyone else wanders ----
+    const distToPlayer = playerPos ? this.pos.distanceTo(playerPos) : Infinity;
+    let chasing = false;
+    if (this.def.hostile && distToPlayer < 18) {
+      chasing = true;
+      this.yaw = Math.atan2(playerPos.x - this.pos.x, playerPos.z - this.pos.z);
+      this.moving = distToPlayer > 1.0;
+    } else {
+      this.aiTimer -= dt;
+      if (this.aiTimer <= 0) {
+        this.aiTimer = 1.5 + Math.random() * 3.5;
+        this.moving = Math.random() < 0.6;
+        this.yaw += (Math.random() - 0.5) * Math.PI * 1.5;
+      }
     }
     this.hurtTimer = Math.max(0, this.hurtTimer - dt);
     this.bodyMat.color.setHex(this.hurtTimer > 0 ? 0xff5050 : this.def.body);
 
-    const speed = this.moving ? 1.3 : 0;
+    const speed = this.moving ? (chasing ? this.def.speed : 1.3) : 0;
     const kb = this.vel.length() > 2;   // during knockback keep momentum
     if (!kb) {
       // model's snout faces +z, so forward = +(sin yaw, cos yaw)
@@ -2890,33 +3047,83 @@ class MobManager {
     this.spawnTimer = 0;
   }
 
-  update(dt, playerPos) {
-    // ---- Spawning on grass around the player ----
+  /**
+   * @param player Player instance (position + damage)
+   * @param daylight 0 (midnight) .. 1 (noon) from the sky
+   */
+  update(dt, player, daylight = 1) {
+    const playerPos = player.position;
+    const night = daylight < 0.2;
+
+    // ---- Spawning ----
     this.spawnTimer -= dt;
-    if (this.spawnTimer <= 0 && this.mobs.length < MAX_MOBS) {
+    if (this.spawnTimer <= 0) {
       this.spawnTimer = 2;
       const ang = Math.random() * Math.PI * 2;
       const dist = SPAWN_MIN + Math.random() * (SPAWN_MAX - SPAWN_MIN);
       const x = Math.floor(playerPos.x + Math.cos(ang) * dist);
       const z = Math.floor(playerPos.z + Math.sin(ang) * dist);
-      const y = this.world.surfaceHeight(x, z);
-      const ground = this.world.getBlock(x, y, z);
-      if (ground === BLOCK.GRASS || ground === BLOCK.SNOW_GRASS) {
-        const type = Math.random() < 0.5 ? 'pig' : 'cow';
-        const mob = new Mob(type, new THREE.Vector3(x + 0.5, y + 1.2, z + 0.5));
-        this.scene.add(mob.group);
-        this.mobs.push(mob);
+      const surface = this.world.surfaceHeight(x, z);
+      const passiveCount = this.mobs.filter((m) => !m.def.hostile).length;
+      const hostileCount = this.mobs.length - passiveCount;
+
+      // Passive animals: daytime, on grass
+      if (passiveCount < MAX_PASSIVE) {
+        const ground = this.world.getBlock(x, surface, z);
+        if (ground === BLOCK.GRASS || ground === BLOCK.SNOW_GRASS) {
+          this._spawn(PASSIVE[Math.floor(Math.random() * PASSIVE.length)],
+            x + 0.5, surface + 1.2, z + 0.5);
+        }
+      }
+
+      // Hostiles: at night on the surface, or any time in caves
+      if (hostileCount < MAX_HOSTILE) {
+        const type = HOSTILE[Math.floor(Math.random() * HOSTILE.length)];
+        if (night && this.world.getBlock(x, surface, z) !== BLOCK.AIR) {
+          this._spawn(type, x + 0.5, surface + 1.2, z + 0.5);
+        } else {
+          // find an air pocket underground (a lit-up loaded cave)
+          for (let y = surface - 8; y > 8; y -= 2) {
+            if (this.world.getBlock(x, y, z) === BLOCK.AIR &&
+                this.world.getBlock(x, y + 1, z) === BLOCK.AIR &&
+                this.world.getBlock(x, y - 1, z) !== BLOCK.AIR) {
+              this._spawn(type, x + 0.5, y + 0.2, z + 0.5);
+              break;
+            }
+          }
+        }
       }
     }
 
     for (let i = this.mobs.length - 1; i >= 0; i--) {
       const mob = this.mobs[i];
-      if (mob.pos.distanceTo(playerPos) > DESPAWN_DIST || mob.pos.y < -20) {
+      const surface = this.world.surfaceHeight(Math.floor(mob.pos.x), Math.floor(mob.pos.z));
+      // Hostiles on the surface disappear at daybreak (no burning animation yet)
+      const daybreakGone = mob.def.hostile && daylight > 0.25 && mob.pos.y > surface - 3;
+      if (mob.pos.distanceTo(playerPos) > DESPAWN_DIST || mob.pos.y < -20 || daybreakGone) {
         this._remove(i);
         continue;
       }
-      mob.update(dt, this.world);
+      mob.update(dt, this.world, playerPos);
+
+      // Hostile contact damage (with knockback on the player)
+      if (mob.def.hostile && !player.creative && !player.dead &&
+          mob.attackCooldown <= 0 &&
+          mob.pos.distanceTo(playerPos) < 1.4) {
+        mob.attackCooldown = 1.0;
+        player.damage(mob.def.dmg);
+        const push = playerPos.clone().sub(mob.pos).setY(0).normalize().multiplyScalar(4);
+        player.velocity.x += push.x;
+        player.velocity.z += push.z;
+        player.velocity.y = Math.max(player.velocity.y, 3);
+      }
     }
+  }
+
+  _spawn(type, x, y, z) {
+    const mob = new Mob(type, new THREE.Vector3(x, y, z));
+    this.scene.add(mob.group);
+    this.mobs.push(mob);
   }
 
   /**
@@ -2934,9 +3141,10 @@ class MobManager {
             py > m.pos.y - 0.1 && py < m.pos.y + m.height + 0.15) {
           this.audio?.play('hurt');
           if (m.hurt(dmg, dir)) {
-            // death: drop 1-2 meat
-            const count = 1 + (Math.random() < 0.5 ? 1 : 0);
-            this.drops.spawn(m.def.drop, count, m.pos.clone().add(new THREE.Vector3(0, 0.5, 0)));
+            if (m.def.drop) {   // death: drop 1-2 of the mob's loot
+              const count = 1 + (Math.random() < 0.5 ? 1 : 0);
+              this.drops.spawn(m.def.drop, count, m.pos.clone().add(new THREE.Vector3(0, 0.5, 0)));
+            }
             this._remove(i);
           }
           return true;
@@ -3184,12 +3392,17 @@ class Player {
       this.hungerTimer = 0;
     }
 
-    // ---- Drowning ----
+    // ---- Drowning (12 s of air, then 1 heart per second) ----
+    this.maxAir = 12;
     if (this.headInWater && !this.flying && !this.creative) {
       this.airTimer = (this.airTimer || 0) + dt;
-      if (this.airTimer > 12 && this.hungerTimer === 0) this.damage(2);
+      if (this.airTimer > this.maxAir) {
+        this._drownTick = (this._drownTick || 0) + dt;
+        if (this._drownTick >= 1) { this._drownTick = 0; this.damage(2); }
+      }
     } else {
       this.airTimer = 0;
+      this._drownTick = 0;
     }
 
     // ---- Camera ----
@@ -3737,6 +3950,7 @@ class Inventory {
     this.onChestChange = null;   // callback after any chest slot changes
     /** Open furnace: reference to {slots:[in,fuel,out], progress, burn}. */
     this.furnace = null;
+    this.onFurnaceChange = null;  // multiplayer sync hook
     this.creativeMode = false;
 
     this._iconCache = new Map();
@@ -3894,6 +4108,7 @@ class Inventory {
     if (--this.dragging.count <= 0) this.dragging = null;
     if (isCraft) this._updateResult();
     if (isChest) this.onChestChange?.();
+    if (isFurnace) this.onFurnaceChange?.();
     this.audio?.play('click');
     this.renderAll();
   }
@@ -3926,6 +4141,7 @@ class Inventory {
         this.dragging.count += out.count;
         this.furnace.slots[2] = null;
       } else return;
+      this.onFurnaceChange?.();
       this.audio?.play('click');
       this.renderAll();
       return;
@@ -3978,6 +4194,7 @@ class Inventory {
     }
     if (isCraft) this._updateResult();
     if (isChest) this.onChestChange?.();
+    if (isFurnace) this.onFurnaceChange?.();
     this.audio?.play('click');
     this.renderAll();
   }
@@ -4080,6 +4297,7 @@ class Inventory {
       this.chest = null;
       this.onChestChange = null;
       this.furnace = null;
+      this.onFurnaceChange = null;
     }
     this.renderAll();
     return this.open;
@@ -4270,6 +4488,16 @@ class HUD {
       d.className = 'drumstick'; d.textContent = '🍗';
       this.els.hunger.appendChild(d);
     }
+    // Air bubbles: appear above the hunger bar while underwater
+    this.els.air = document.createElement('div');
+    this.els.air.id = 'air-bar';
+    this.els.air.className = 'bar-row';
+    for (let i = 0; i < 10; i++) {
+      const b = document.createElement('div');
+      b.className = 'bubble'; b.textContent = '●';
+      this.els.air.appendChild(b);
+    }
+    document.getElementById('status-bars').appendChild(this.els.air);
   }
 
   toggleDebug() {
@@ -4312,6 +4540,17 @@ class HUD {
       this.els.fps.textContent = `FPS: ${this.fps}`;
       this.els.coords.textContent =
         `XYZ: ${p.x.toFixed(1)} ${p.y.toFixed(1)} ${p.z.toFixed(1)}  |  Chunk: ${cx},${cz}`;
+    }
+
+    // ---- Air bubbles (only while holding breath) ----
+    const underwater = this.player.headInWater || (this.player.airTimer || 0) > 0;
+    this.els.air.style.display = underwater && !this.player.creative ? 'flex' : 'none';
+    if (underwater) {
+      const frac = Math.max(0, 1 - (this.player.airTimer || 0) / (this.player.maxAir || 12));
+      const bubbles = Math.ceil(frac * 10);
+      [...this.els.air.children].forEach((el, i) => {
+        el.className = 'bubble' + (i < bubbles ? '' : ' empty');
+      });
     }
 
     // ---- Health / hunger ----
@@ -5388,13 +5627,15 @@ const settings = new Settings({
   volume: (v) => { audio.setVolume(v / 100); },
 });
 
-// ---------------------------------------------------------------- Chest sync helpers
+// ---------------------------------------------------------------- Chest/furnace sync helpers
 const packChest = (slots) => slots.map((s) => (s ? { i: s.id, c: s.count } : 0));
-const unpackChest = (arr) => {
-  const out = new Array(27).fill(null);
-  if (arr) for (let i = 0; i < 27; i++) { const v = arr[i]; if (v && v.i) out[i] = { id: v.i, count: v.c || 1 }; }
+const unpackChest = (arr, size = 27) => {
+  const out = new Array(size).fill(null);
+  if (arr) for (let i = 0; i < size; i++) { const v = arr[i]; if (v && v.i) out[i] = { id: v.i, count: v.c || 1 }; }
   return out;
 };
+const packFurnace = (f) => ({ s: packChest(f.slots), p: Math.round(f.progress * 10) / 10, b: Math.round(f.burn) });
+const unpackFurnace = (v) => ({ slots: unpackChest(v?.s, 3), progress: v?.p || 0, burn: v?.b || 0 });
 
 // ---------------------------------------------------------------- Game lifecycle
 async function startGame(opts) {
@@ -5444,7 +5685,8 @@ async function startGame(opts) {
   const saved = SaveSystem.peek(saveKey);
   if (saved && (!saved.seed || saved.seed === seed)) saveSystem.restore(saved);
   else {
-    // Spiral out from the origin until we find dry land to spawn on
+    // Spiral out from the origin until we find dry land to spawn on —
+    // skipping columns where a cave/ravine has carved away the surface
     let sx = 0, sz = 0;
     outer:
     for (let r = 0; r < 64; r++) {
@@ -5452,7 +5694,11 @@ async function startGame(opts) {
         const ang = (a / Math.max(1, r * 6)) * Math.PI * 2;
         const x = Math.round(Math.cos(ang) * r * 8);
         const z = Math.round(Math.sin(ang) * r * 8);
-        if (world.gen.column(x, z).height > CONFIG.SEA_LEVEL + 1) { sx = x; sz = z; break outer; }
+        const h = world.gen.column(x, z).height;
+        if (h > CONFIG.SEA_LEVEL + 1 &&
+            !world.gen.isCave(x, h, z) && !world.gen.isCave(x, h - 1, z) && !world.gen.isCave(x, h - 2, z)) {
+          sx = x; sz = z; break outer;
+        }
       }
     }
     player.position.set(sx + 0.5, world.surfaceHeight(sx, sz) + 2, sz + 0.5);
@@ -5478,8 +5724,20 @@ async function startGame(opts) {
     }
     if (blockId === BLOCK.FURNACE) {
       const p = interaction.target.pos;
-      inventory.openFurnace(world.getFurnace(`${p.x},${p.y},${p.z}`));
+      const key = `${p.x},${p.y},${p.z}`;
+      game.openFurnaceKey = key;
+      inventory.openFurnace(world.getFurnace(key));
+      inventory.onFurnaceChange = () => game.session?.setFurnace(key, packFurnace(world.getFurnace(key)));
       setMode('inventory');
+      return true;
+    }
+    if (blockId === BLOCK.BED) {
+      if (sky.daylight < 0.15) {
+        sky.time = 0.01;   // sunrise
+        commands.print('You sleep through the night... good morning!');
+      } else {
+        commands.print('You can only sleep at night.');
+      }
       return true;
     }
     return false;
@@ -5534,6 +5792,22 @@ async function startGame(opts) {
           }
         }
         if (game.inventory.open && game.inventory.chest) game.inventory.renderAll();
+      },
+      onFurnaces(all) {
+        for (const [key, packed] of Object.entries(all)) {
+          const fresh = unpackFurnace(packed);
+          const existing = game.world.furnaces[key];
+          if (existing) {   // update in place so an open furnace UI stays live
+            existing.slots[0] = fresh.slots[0];
+            existing.slots[1] = fresh.slots[1];
+            existing.slots[2] = fresh.slots[2];
+            existing.progress = fresh.progress;
+            existing.burn = fresh.burn;
+          } else {
+            game.world.furnaces[key] = fresh;
+          }
+        }
+        if (game.inventory.open && game.inventory.furnace) game.inventory.renderAll();
       },
       onChat(m) { game.commands.print(`<${m.name}> ${m.text}`); },
     });
@@ -5698,12 +5972,17 @@ function frame() {
     player.update(dt);
     interaction.update(dt);
     world.update(player.position);
+    world.updateWater(dt);
     sky.update(dt, player.position, world.renderDistance);
     saveSystem.update(dt);
     game.drops.update(dt, player, game.inventory);
-    game.mobs.update(dt, player.position);
-    if (world.tickFurnaces(dt) && game.inventory.open && game.inventory.furnace) {
-      game.inventory.renderAll();
+    game.mobs.update(dt, player, sky.daylight);
+    if (world.tickFurnaces(dt)) {
+      if (game.inventory.open && game.inventory.furnace) game.inventory.renderAll();
+      // Multiplayer: sync the furnace you have open (its state just changed)
+      if (game.session && game.openFurnaceKey && world.furnaces[game.openFurnaceKey]) {
+        game.session.setFurnace(game.openFurnaceKey, packFurnace(world.furnaces[game.openFurnaceKey]));
+      }
     }
     game.inventory.updateFurnaceView();
 

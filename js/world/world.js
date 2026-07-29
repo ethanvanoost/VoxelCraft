@@ -27,6 +27,11 @@ export class World {
     this.edits = {};                  // "x,y,z" -> block id (player modifications)
     this.chests = {};                 // "x,y,z" -> array(27) of {id,count}|null
     this.furnaces = {};               // "x,y,z" -> {slots:[in,fuel,out], progress, burn}
+
+    // ---- Flowing water ----
+    this.waterQueue = new Set();      // posKeys of water blocks to update
+    this.waterLevels = {};            // posKey -> spread level (7 = source)
+    this._waterTimer = 0;
     this.onEdit = null;               // hook: (x, y, z, id) after a player edit (multiplayer sync)
     this.renderDistance = CONFIG.RENDER_DISTANCE;
     this.genQueue = [];               // chunks waiting for generation+mesh
@@ -76,6 +81,14 @@ export class World {
     if (record) {
       this.edits[`${x},${y},${z}`] = id;
       this.onEdit?.(x, y, z, id);
+    }
+
+    // Wake up water: this block and any water neighbors may need to flow
+    if (id === BLOCK.WATER) this.waterQueue.add(`${x},${y},${z}`);
+    for (const [dx, dy, dz] of [[1,0,0],[-1,0,0],[0,0,1],[0,0,-1],[0,1,0]]) {
+      if (this.getBlock(x + dx, y + dy, z + dz) === BLOCK.WATER) {
+        this.waterQueue.add(`${x + dx},${y + dy},${z + dz}`);
+      }
     }
 
     // Neighbor chunks need remeshing if the edit touches their border
@@ -227,6 +240,44 @@ export class World {
       chunk.meshes = null;
     }
     if (!keepData) chunk.generated = false;
+  }
+
+  /**
+   * Flowing water: every 0.25 s, queued water blocks fall into air below or
+   * spread sideways with a decreasing level (source = 7), Minecraft-style.
+   * Natural ocean/river water counts as a source.
+   */
+  updateWater(dt) {
+    this._waterTimer += dt;
+    if (this._waterTimer < 0.25 || this.waterQueue.size === 0) return;
+    this._waterTimer = 0;
+
+    const batch = [...this.waterQueue].slice(0, 120);
+    for (const key of batch) {
+      this.waterQueue.delete(key);
+      const [x, y, z] = key.split(',').map(Number);
+      if (this.getBlock(x, y, z) !== BLOCK.WATER) continue;
+      const level = this.waterLevels[key] ?? 7;
+
+      // Fall straight down first (falling water is always "full strength")
+      if (this.getBlock(x, y - 1, z) === BLOCK.AIR) {
+        const below = `${x},${y - 1},${z}`;
+        this.waterLevels[below] = 7;
+        this.setBlock(x, y - 1, z, BLOCK.WATER);
+        continue;
+      }
+
+      // Otherwise spread sideways, weakening with distance
+      if (level > 1) {
+        for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+          if (this.getBlock(x + dx, y, z + dz) === BLOCK.AIR) {
+            const nKey = `${x + dx},${y},${z + dz}`;
+            this.waterLevels[nKey] = level - 1;
+            this.setBlock(x + dx, y, z + dz, BLOCK.WATER);
+          }
+        }
+      }
+    }
   }
 
   /** Furnace state at a position (created on first open). */

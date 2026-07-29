@@ -17,7 +17,7 @@
 import { BLOCK, ITEM, TOOL_TIERS } from './blocks.js';
 
 const { LOG, PLANKS, SAND, SANDSTONE, STONE, STONE_BRICKS, COBBLESTONE,
-        CRAFTING_TABLE, FURNACE, CHEST,
+        CRAFTING_TABLE, FURNACE, CHEST, WOOL, BED,
         COAL_BLOCK, IRON_BLOCK, GOLD_BLOCK, DIAMOND_BLOCK } = BLOCK;
 const { STICK, COAL, IRON_INGOT, GOLD_INGOT, DIAMOND } = ITEM;
 
@@ -65,6 +65,12 @@ export const RECIPES = [
     ], result: { id: FURNACE, count: 1 } },
   { shape: [[STONE, STONE], [STONE, STONE]], result: { id: STONE_BRICKS, count: 4 } },
   { shape: [[SAND, SAND], [SAND, SAND]], result: { id: SANDSTONE, count: 1 } },
+
+  // Bed — authentic recipe: 3 wool over 3 planks (needs a crafting table)
+  { shape: [
+      [WOOL, WOOL, WOOL],
+      [PLANKS, PLANKS, PLANKS],
+    ], result: { id: BED, count: 1 } },
 
   // ---------------- Mineral storage blocks (9 ↔ block) ----------------
   { shape: fill3x3(COAL), result: { id: COAL_BLOCK, count: 1 } },
