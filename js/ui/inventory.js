@@ -178,7 +178,8 @@ export class Inventory {
 
   /** Deposit exactly one item into a slot during a right-button drag. */
   _dragPlaceOne(index) {
-    if (index === RESULT_INDEX || index >= CREATIVE_BASE || index === FURNACE_BASE + 2) return;
+    if (index === RESULT_INDEX || index === FURNACE_BASE + 2) return;
+    if (index >= CREATIVE_BASE && index < FURNACE_BASE) return;
     const isFurnace = index >= FURNACE_BASE;
     const isChest = !isFurnace && index >= CHEST_BASE;
     const isCraft = !isFurnace && !isChest && index >= CRAFT_BASE;
@@ -207,7 +208,7 @@ export class Inventory {
     if (index === RESULT_INDEX) { this._takeResult(); return; }
 
     // Creative palette: click grabs a full stack; click while holding = trash
-    if (index >= CREATIVE_BASE) {
+    if (index >= CREATIVE_BASE && index < FURNACE_BASE) {
       if (this.dragging) { this.dragging = null; }
       else {
         const id = this._creativeIds[index - CREATIVE_BASE];
@@ -234,7 +235,7 @@ export class Inventory {
     }
 
     // Route to the right backing array (slots / craft grid / chest / furnace)
-    const isFurnace = index >= FURNACE_BASE;
+    const isFurnace = index >= FURNACE_BASE && index < FURNACE_BASE + 3;
     const isChest = !isFurnace && index >= CHEST_BASE && index < CREATIVE_BASE;
     const isCraft = !isFurnace && !isChest && index >= CRAFT_BASE;
     const arr = isFurnace ? this.furnace?.slots
