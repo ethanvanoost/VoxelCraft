@@ -2834,8 +2834,9 @@ class Mob {
     const speed = this.moving ? 1.3 : 0;
     const kb = this.vel.length() > 2;   // during knockback keep momentum
     if (!kb) {
-      this.vel.x = -Math.sin(this.yaw) * speed;
-      this.vel.z = -Math.cos(this.yaw) * speed;
+      // model's snout faces +z, so forward = +(sin yaw, cos yaw)
+      this.vel.x = Math.sin(this.yaw) * speed;
+      this.vel.z = Math.cos(this.yaw) * speed;
     }
     this.vel.y += -26 * dt;
     this.vel.y = Math.max(this.vel.y, -40);
