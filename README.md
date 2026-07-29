@@ -26,16 +26,30 @@ powershell -ExecutionPolicy Bypass -File build-standalone.ps1
 | Ctrl | Sprint |
 | Shift | Crouch / fly down |
 | F | Toggle fly mode |
+| F5 | Camera: first / third / second person |
 | Left click (hold) | Break block (cracking animation, per-block mining speed) |
-| Right click | Place block / open crafting table |
+| Right click | Place block / open crafting table or chest |
 | 1–9 / scroll wheel | Select hotbar slot |
 | E | Inventory & 2×2 crafting (drag & drop, right-click to split/place-one) |
+| T | Chat (plain text) and /commands |
 | T or / | Command console |
 | F3 | Debug screen |
 | Esc | Pause menu / settings |
 
 ### Commands
-`/tp x y z` · `/time set day|night|noon|midnight|0..1` · `/give <block> [count]` · `/gamemode creative|survival` · `/seed` · `/clear`
+`/tp x y z` · `/time set day|night|noon|midnight|0..1` · `/give <block|item> [count]` · `/gamemode creative|survival` · `/seed` · `/clear`
+
+Commands only work when the world was created with **Allow cheats** (on servers: the creator can always cheat; others only if the server allows it).
+
+## Menus, worlds & multiplayer
+
+- **Username first:** pick a 3–16 character name; it's stored in your browser (different browser = different identity). With Firebase configured, availability is checked globally.
+- **Singleplayer:** create unlimited worlds — name, seed (optional), Survival/Creative, cheats on/off. Each saves separately in your browser; delete from the list.
+- **Creative mode:** fly freely, instant block breaking, no health/hunger, and the inventory shows a creative palette — click any block/item to grab a full stack.
+- **Chests:** craft one (8 planks), place it, right-click to open — 27 shared slots. Contents persist in the world save (or in Firebase on servers, live-synced between players). Breaking a chest hands you its contents.
+- **Skin editor:** recolor head/body/arms/legs/eyes; other players see your skin, and your name floats above your head.
+- **Multiplayer:** needs a free Firebase project — full setup + security rules in [firebase-rules.md](firebase-rules.md). Then: create named servers, join others, build together (block edits, chests and chat sync live; chat messages auto-delete after 5 minutes).
+- **Ctrl+W:** the browser owns this shortcut, so the game can't fully block it — you get a "Leave site?" confirmation instead, and in fullscreen (where the Keyboard Lock API works) Ctrl+W is captured completely. F5 is fully repurposed as the camera toggle.
 
 ## Getting started (survival)
 

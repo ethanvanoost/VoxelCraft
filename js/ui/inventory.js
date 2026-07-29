@@ -7,7 +7,7 @@
  * then a crafting table (see core/recipes.js).
  */
 
-import { BLOCK, faceTile, itemDef, maxStack } from '../core/blocks.js';
+import { BLOCK, ITEM, BLOCK_DEFS, faceTile, itemDef, maxStack } from '../core/blocks.js';
 import { matchRecipe } from '../core/recipes.js';
 
 const HOTBAR_SIZE = 9;
@@ -16,6 +16,8 @@ const MAIN_SIZE = 27;
 // Slot index namespaces for click routing
 const CRAFT_BASE = 100;   // craft grid cells are CRAFT_BASE + i (i in 0..8)
 const RESULT_INDEX = 200; // crafting result slot
+const CHEST_BASE = 400;   // open-chest slots are CHEST_BASE + i (i in 0..26)
+const CREATIVE_BASE = 600;// creative palette entries
 
 export class Inventory {
   constructor(atlas, audio) {
@@ -32,6 +34,11 @@ export class Inventory {
     this.craftSize = 2;
     this.result = null;     // computed {id, count} preview
 
+    /** Open chest: reference to a 27-slot array (world/chest storage). */
+    this.chest = null;
+    this.onChestChange = null;   // callback after any chest slot changes
+    this.creativeMode = false;
+
     this._iconCache = new Map();
     this._els = {
       hotbar: document.getElementById('hotbar'),
@@ -40,6 +47,11 @@ export class Inventory {
       invHotbar: document.getElementById('inventory-hotbar'),
       craftGrid: document.getElementById('craft-grid'),
       craftResult: document.getElementById('craft-result'),
+      craftBlock: document.getElementById('craft-block'),
+      chestArea: document.getElementById('chest-area'),
+      chestGrid: document.getElementById('chest-grid'),
+      creativeArea: document.getElementById('creative-area'),
+      creativeGrid: document.getElementById('creative-grid'),
       drag: document.getElementById('drag-item'),
       name: document.getElementById('selected-block-name'),
     };
@@ -107,6 +119,17 @@ export class Inventory {
     for (let i = 0; i < HOTBAR_SIZE; i++) invHotbar.appendChild(this._makeSlot(i, true));
     for (let i = 0; i < 9; i++) craftGrid.appendChild(this._makeSlot(CRAFT_BASE + i, true));
     craftResult.appendChild(this._makeSlot(RESULT_INDEX, true));
+    for (let i = 0; i < 27; i++) this._els.chestGrid.appendChild(this._makeSlot(CHEST_BASE + i, true));
+
+    // Creative palette: every real block + item, one slot each
+    this._creativeIds = [
+      ...Object.keys(BLOCK_DEFS).map(Number).filter((id) => id !== BLOCK.AIR),
+      ...Object.values(ITEM),
+    ];
+    this._creativeIds.forEach((id, i) => {
+      const el = this._makeSlot(CREATIVE_BASE + i, true);
+      this._els.creativeGrid.appendChild(el);
+    });
     this._applyCraftSize();
   }
 
@@ -140,10 +163,24 @@ export class Inventory {
 
     if (index === RESULT_INDEX) { this._takeResult(); return; }
 
-    // Route to the right backing array (main slots vs craft grid)
-    const isCraft = index >= CRAFT_BASE;
-    const arr = isCraft ? this.craft : this.slots;
-    const i = isCraft ? index - CRAFT_BASE : index;
+    // Creative palette: click grabs a full stack; click while holding = trash
+    if (index >= CREATIVE_BASE) {
+      if (this.dragging) { this.dragging = null; }
+      else {
+        const id = this._creativeIds[index - CREATIVE_BASE];
+        this.dragging = { id, count: maxStack(id) };
+      }
+      this.audio?.play('click');
+      this.renderAll();
+      return;
+    }
+
+    // Route to the right backing array (main slots / craft grid / open chest)
+    const isChest = index >= CHEST_BASE && index < CREATIVE_BASE;
+    const isCraft = !isChest && index >= CRAFT_BASE;
+    const arr = isChest ? this.chest : isCraft ? this.craft : this.slots;
+    const i = isChest ? index - CHEST_BASE : isCraft ? index - CRAFT_BASE : index;
+    if (!arr) return;
     const slot = arr[i];
 
     if (!this.dragging) {
@@ -179,6 +216,7 @@ export class Inventory {
       }
     }
     if (isCraft) this._updateResult();
+    if (isChest) this.onChestChange?.();
     this.audio?.play('click');
     this.renderAll();
   }
@@ -263,16 +301,31 @@ export class Inventory {
       this.craftSize = craftSize;
       this._applyCraftSize();
       this._updateResult();
+      this._els.chestArea.classList.toggle('hidden', !this.chest);
+      this._els.craftBlock.classList.toggle('hidden', !!this.chest);
+      this._els.creativeArea.classList.toggle('hidden', !this.creativeMode || !!this.chest);
     } else {
       this._dumpCraftGrid();             // don't lose items left in the grid
       if (this.dragging) {               // drop held stack back into inventory
-        this.add(this.dragging.id, this.dragging.count);
+        if (!this.creativeMode) this.add(this.dragging.id, this.dragging.count);
         this.dragging = null;
       }
+      this.chest = null;
+      this.onChestChange = null;
     }
     this.renderAll();
     return this.open;
   }
+
+  /** Open the inventory with a chest's 27 slots attached. */
+  openChest(chestSlots, onChange) {
+    this.chest = chestSlots;
+    this.onChestChange = onChange || null;
+    this.open = false;       // force toggle() into the "opening" branch
+    this.toggle();
+  }
+
+  setCreative(on) { this.creativeMode = !!on; }
 
   // ---------------- Rendering ----------------
 
@@ -344,6 +397,15 @@ export class Inventory {
     [...craftGrid.children].forEach((el, i) =>
       this._renderSlot(el, this.craft[i], false));
     this._renderSlot(craftResult.firstChild, this.result, false);
+    if (this.chest) {
+      [...this._els.chestGrid.children].forEach((el, i) =>
+        this._renderSlot(el, this.chest[i], false));
+    }
+    if (this.creativeMode && !this._creativeRendered) {
+      [...this._els.creativeGrid.children].forEach((el, i) =>
+        this._renderSlot(el, { id: this._creativeIds[i], count: 1 }, false));
+      this._creativeRendered = true;
+    }
 
     // Cursor-held stack
     drag.classList.toggle('hidden', !this.dragging);

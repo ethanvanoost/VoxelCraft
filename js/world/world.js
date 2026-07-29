@@ -25,6 +25,8 @@ export class World {
     this.gen = new WorldGen(seed);
     this.chunks = new Map();          // "cx,cz" -> Chunk
     this.edits = {};                  // "x,y,z" -> block id (player modifications)
+    this.chests = {};                 // "x,y,z" -> array(27) of {id,count}|null
+    this.onEdit = null;               // hook: (x, y, z, id) after a player edit (multiplayer sync)
     this.renderDistance = CONFIG.RENDER_DISTANCE;
     this.genQueue = [];               // chunks waiting for generation+mesh
 
@@ -70,7 +72,10 @@ export class World {
     if (!chunk) return;
     const lx = x - cx * CHUNK_SIZE, lz = z - cz * CHUNK_SIZE;
     chunk.set(lx, y, lz, id);
-    if (record) this.edits[`${x},${y},${z}`] = id;
+    if (record) {
+      this.edits[`${x},${y},${z}`] = id;
+      this.onEdit?.(x, y, z, id);
+    }
 
     // Neighbor chunks need remeshing if the edit touches their border
     if (lx === 0) this.markDirty(cx - 1, cz);
@@ -221,6 +226,18 @@ export class World {
       chunk.meshes = null;
     }
     if (!keepData) chunk.generated = false;
+  }
+
+  /** Chest contents at a position (created empty on first open). */
+  getChest(posKey) {
+    if (!this.chests[posKey]) this.chests[posKey] = new Array(27).fill(null);
+    return this.chests[posKey];
+  }
+
+  removeChest(posKey) {
+    const contents = this.chests[posKey] || [];
+    delete this.chests[posKey];
+    return contents.filter(Boolean);
   }
 
   /** Number of chunk draw objects currently in the scene (debug). */

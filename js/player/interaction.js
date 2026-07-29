@@ -134,6 +134,14 @@ export class Interaction {
         this.breakProgress = 0;
       }
       const def = blockDef(this.target.id);
+
+      // Creative mode: instant break, anything goes
+      if (this.player.creative) {
+        this.breakBlock(this.target.pos, this.target.id);
+        this._resetBreaking();
+        this.buttons.left = false;   // one block per click
+        return;
+      }
       if (def.hardness === Infinity) { this._updateCrack(-1); return; }
 
       // Matching tool in hand mines faster (e.g. pickaxe on stone)
@@ -185,6 +193,14 @@ export class Interaction {
 
   breakBlock(pos, id) {
     this.world.setBlock(pos.x, pos.y, pos.z, BLOCK.AIR);
+
+    // Breaking a chest hands you its contents (no item entities yet)
+    if (id === BLOCK.CHEST) {
+      const key = `${pos.x},${pos.y},${pos.z}`;
+      for (const s of this.world.removeChest(key)) this.inventory.add(s.id, s.count);
+      this.onChestBroken?.(key);
+    }
+
     this.inventory.add(blockDrop(id), 1);
     this.audio?.breakBlock(id);
   }

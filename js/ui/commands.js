@@ -18,6 +18,9 @@ export class Commands {
     this.sky = sky;
     this.open = false;
     this.creative = false;
+    this.cheatsAllowed = true;     // set by main.js from world/server settings
+    this.username = 'Player';
+    this.onChat = null;            // multiplayer chat hook: (text) => void
 
     this.input = document.getElementById('chat-input');
     this.chat = document.getElementById('chat');
@@ -54,7 +57,16 @@ export class Commands {
 
   run(text) {
     if (!text) return;
-    if (!text.startsWith('/')) { this.print(`<you> ${text}`); return; }
+    if (!text.startsWith('/')) {
+      // Plain chat: broadcast in multiplayer, echo locally otherwise
+      if (this.onChat) this.onChat(text);
+      else this.print(`<${this.username}> ${text}`);
+      return;
+    }
+    if (!this.cheatsAllowed) {
+      this.print('Cheats are disabled in this world.');
+      return;
+    }
     const [cmd, ...args] = text.slice(1).split(/\s+/);
 
     switch (cmd.toLowerCase()) {

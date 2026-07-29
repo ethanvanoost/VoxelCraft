@@ -45,14 +45,24 @@
   <div id="selected-block-name"></div>
 </div>
 
-<!-- ======================= Inventory ======================= -->
+<!-- ======================= Inventory / Chest ======================= -->
 <div id="inventory-screen" class="overlay hidden">
   <div id="inventory-window">
-    <div class="inv-title">Crafting</div>
-    <div id="craft-area">
-      <div id="craft-grid"></div>
-      <div class="craft-arrow">&#10132;</div>
-      <div id="craft-result"></div>
+    <div id="chest-area" class="hidden">
+      <div class="inv-title">Chest</div>
+      <div id="chest-grid"></div>
+    </div>
+    <div id="craft-block">
+      <div class="inv-title">Crafting</div>
+      <div id="craft-area">
+        <div id="craft-grid"></div>
+        <div class="craft-arrow">&#10132;</div>
+        <div id="craft-result"></div>
+      </div>
+    </div>
+    <div id="creative-area" class="hidden">
+      <div class="inv-title">Creative &mdash; click to grab</div>
+      <div id="creative-grid"></div>
     </div>
     <div class="inv-title">Inventory</div>
     <div id="inventory-grid"></div>
@@ -63,25 +73,96 @@
 
 <!-- ======================= Chat / commands ======================= -->
 <div id="chat" class="hidden">
-  <input id="chat-input" type="text" autocomplete="off" spellcheck="false" placeholder="Type a command, e.g. /time set day">
+  <input id="chat-input" type="text" autocomplete="off" spellcheck="false" placeholder="Chat, or /command (T to open)">
 </div>
 <div id="chat-log"></div>
 
-<!-- ======================= Pause / Settings menu ======================= -->
+<!-- ======================= Menu system ======================= -->
 <div id="menu" class="overlay">
   <div id="menu-window">
     <h1 class="logo">VoxelCraft</h1>
-    <div id="menu-main">
-      <button id="btn-play" class="mc-btn">Play</button>
+
+    <!-- Username -->
+    <div id="screen-username" class="screen hidden">
+      <div class="menu-label">Choose your username</div>
+      <input id="username-input" class="mc-input" maxlength="16" placeholder="Steve" autocomplete="off">
+      <div id="username-status" class="menu-note"></div>
+      <button id="btn-username-ok" class="mc-btn">Continue</button>
+    </div>
+
+    <!-- Title -->
+    <div id="screen-main" class="screen hidden">
+      <div id="hello-user" class="menu-note"></div>
+      <button id="btn-singleplayer" class="mc-btn">Singleplayer</button>
+      <button id="btn-multiplayer" class="mc-btn">Multiplayer</button>
+      <button id="btn-skin" class="mc-btn">Skin Editor</button>
       <button id="btn-settings" class="mc-btn">Settings</button>
-      <button id="btn-save" class="mc-btn">Save World</button>
-      <button id="btn-reset" class="mc-btn danger">Delete World &amp; New Seed</button>
       <div class="menu-hint">
         WASD move &middot; Space jump &middot; Ctrl sprint &middot; Shift crouch &middot; F fly<br>
-        LMB break &middot; RMB place/use &middot; E inventory &amp; crafting &middot; 1-9 / wheel select<br>
-        Punch trees for wood! &middot; F3 debug &middot; T commands &middot; Esc pause
+        LMB break &middot; RMB place/use &middot; E inventory &amp; crafting &middot; T chat<br>
+        F5 camera &middot; F3 debug &middot; Esc pause
       </div>
     </div>
+
+    <!-- Singleplayer world list -->
+    <div id="screen-worlds" class="screen hidden">
+      <div class="menu-label">Your Worlds</div>
+      <div id="world-list" class="list"></div>
+      <div class="form-row">
+        <input id="world-name" class="mc-input" placeholder="New world name" maxlength="24">
+        <input id="world-seed" class="mc-input narrow" placeholder="Seed (optional)">
+      </div>
+      <div class="form-row">
+        <select id="world-mode" class="mc-input narrow">
+          <option value="survival">Survival</option>
+          <option value="creative">Creative</option>
+        </select>
+        <label class="check"><input type="checkbox" id="world-cheats"> Allow cheats</label>
+      </div>
+      <button id="btn-world-create" class="mc-btn">Create New World</button>
+      <button id="btn-worlds-back" class="mc-btn small">Back</button>
+    </div>
+
+    <!-- Multiplayer server list -->
+    <div id="screen-servers" class="screen hidden">
+      <div class="menu-label">Multiplayer</div>
+      <div id="server-status" class="menu-note"></div>
+      <div id="server-list" class="list"></div>
+      <div class="form-row">
+        <input id="server-name" class="mc-input" placeholder="New server name" maxlength="24">
+      </div>
+      <div class="form-row">
+        <select id="server-mode" class="mc-input narrow">
+          <option value="survival">Survival</option>
+          <option value="creative">Creative</option>
+        </select>
+        <label class="check"><input type="checkbox" id="server-cheats"> Allow cheats for everyone</label>
+      </div>
+      <button id="btn-server-create" class="mc-btn">Create Server</button>
+      <button id="btn-servers-back" class="mc-btn small">Back</button>
+    </div>
+
+    <!-- Skin editor -->
+    <div id="screen-skin" class="screen hidden">
+      <div class="menu-label">Skin Editor</div>
+      <canvas id="skin-preview" width="128" height="192"></canvas>
+      <div class="form-row skin-row"><label>Head</label><input type="color" id="skin-head" value="#c8945f"></div>
+      <div class="form-row skin-row"><label>Body</label><input type="color" id="skin-body" value="#00a8a8"></div>
+      <div class="form-row skin-row"><label>Arms</label><input type="color" id="skin-arms" value="#c8945f"></div>
+      <div class="form-row skin-row"><label>Legs</label><input type="color" id="skin-legs" value="#3f3f8f"></div>
+      <div class="form-row skin-row"><label>Eyes</label><input type="color" id="skin-eyes" value="#3f3fff"></div>
+      <button id="btn-skin-save" class="mc-btn">Save Skin</button>
+      <button id="btn-skin-back" class="mc-btn small">Back</button>
+    </div>
+
+    <!-- Pause -->
+    <div id="screen-pause" class="screen hidden">
+      <button id="btn-resume" class="mc-btn">Back to Game</button>
+      <button id="btn-pause-settings" class="mc-btn">Settings</button>
+      <button id="btn-quit" class="mc-btn">Save &amp; Quit to Title</button>
+    </div>
+
+    <!-- Settings (shared) -->
     <div id="menu-settings" class="hidden">
       <div class="setting-row">
         <label>Render Distance: <span id="val-render">6</span></label>

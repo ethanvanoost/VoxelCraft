@@ -39,6 +39,8 @@ export class Player {
     this.sensitivity = 1.0;
     this.keys = {};
     this.enabled = false;   // pointer is locked & game running
+    /** 0 = first person, 1 = third person (behind), 2 = second person (front) */
+    this.cameraMode = 0;
 
     this._bindInput();
   }
@@ -49,6 +51,10 @@ export class Player {
       this.keys[e.code] = true;
       if (e.code === 'KeyF') this.toggleFly();
       if (e.code === 'Space') this._tryJump();
+      if (e.code === 'F5') {   // camera toggle instead of page refresh
+        e.preventDefault();
+        this.cameraMode = (this.cameraMode + 1) % 3;
+      }
     });
     document.addEventListener('keyup', (e) => { this.keys[e.code] = false; });
     document.addEventListener('mousemove', (e) => {
@@ -197,18 +203,22 @@ export class Player {
     const bobY = Math.abs(Math.sin(this.bobPhase)) * 0.06;
     const bobX = Math.sin(this.bobPhase) * 0.03;
 
-    // ---- Hunger / regen ----
+    // ---- Hunger / regen (creative mode has no survival stats drain) ----
     this.hungerTimer += dt;
-    const drain = this.sprinting ? 0.045 : 0.008;
-    this.hunger = Math.max(0, this.hunger - drain * dt * 10);
-    if (this.hungerTimer > 4) {
+    if (!this.creative) {
+      const drain = this.sprinting ? 0.045 : 0.008;
+      this.hunger = Math.max(0, this.hunger - drain * dt * 10);
+      if (this.hungerTimer > 4) {
+        this.hungerTimer = 0;
+        if (this.hunger >= 18 && this.health < 20) this.health = Math.min(20, this.health + 1);
+        if (this.hunger <= 0) this.damage(1);   // starving
+      }
+    } else if (this.hungerTimer > 4) {
       this.hungerTimer = 0;
-      if (this.hunger >= 18 && this.health < 20) this.health = Math.min(20, this.health + 1);
-      if (this.hunger <= 0) this.damage(1);   // starving
     }
 
     // ---- Drowning ----
-    if (this.headInWater && !this.flying) {
+    if (this.headInWater && !this.flying && !this.creative) {
       this.airTimer = (this.airTimer || 0) + dt;
       if (this.airTimer > 12 && this.hungerTimer === 0) this.damage(2);
     } else {
@@ -216,14 +226,35 @@ export class Player {
     }
 
     // ---- Camera ----
-    this.camera.position.set(
-      pos.x + bobX * Math.cos(this.yaw),
-      pos.y + this.eyeHeight + bobY,
-      pos.z + bobX * Math.sin(this.yaw)
-    );
+    const eyeX = pos.x + bobX * Math.cos(this.yaw);
+    const eyeY = pos.y + this.eyeHeight + bobY;
+    const eyeZ = pos.z + bobX * Math.sin(this.yaw);
     this.camera.rotation.set(0, 0, 0);
     this.camera.rotateY(this.yaw);
     this.camera.rotateX(this.pitch);
+
+    if (this.cameraMode === 0) {
+      this.camera.position.set(eyeX, eyeY, eyeZ);
+    } else {
+      // 3rd person = behind the head, 2nd person = in front looking back
+      const dir = new THREE.Vector3();
+      this.camera.getWorldDirection(dir);
+      const sign = this.cameraMode === 1 ? -1 : 1;
+      // Pull the camera out until it would enter a solid block
+      let dist = 4;
+      for (let d = 0.5; d <= 4; d += 0.25) {
+        const px = eyeX + dir.x * d * sign;
+        const py = eyeY + dir.y * d * sign;
+        const pz = eyeZ + dir.z * d * sign;
+        if (this.world.isSolidAt(px, py, pz)) { dist = Math.max(0.5, d - 0.35); break; }
+      }
+      this.camera.position.set(
+        eyeX + dir.x * dist * sign,
+        eyeY + dir.y * dist * sign,
+        eyeZ + dir.z * dist * sign
+      );
+      if (this.cameraMode === 2) this.camera.rotateY(Math.PI); // face the player
+    }
   }
 
   _applyFallDamage() {
