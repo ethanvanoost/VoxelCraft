@@ -25,6 +25,8 @@ $order = @(
   'js/world/world.js',
   'js/net/firebase-config.js',
   'js/net/net.js',
+  'js/entities/drops.js',
+  'js/entities/mobs.js',
   'js/player/player.js',
   'js/player/avatar.js',
   'js/player/interaction.js',

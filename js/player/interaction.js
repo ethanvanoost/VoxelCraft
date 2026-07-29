@@ -6,7 +6,7 @@
 
 import * as THREE from 'three';
 import { CONFIG } from '../core/config.js';
-import { BLOCK, blockDef, blockDrop, isSolid, itemDef, isPlaceable, toolClassFor } from '../core/blocks.js';
+import { BLOCK, blockDef, blockDrop, isSolid, itemDef, isPlaceable, toolClassFor, attackDamage } from '../core/blocks.js';
 
 export class Interaction {
   constructor(world, player, inventory, atlas, scene, audio) {
@@ -26,6 +26,11 @@ export class Interaction {
     /** Optional hook: (blockId) => true if the block was "used" (e.g. opens
      *  a crafting table UI). Set by main.js. Crouching bypasses it. */
     this.onUseBlock = null;
+    /** Optional hook: (damage) => true if a mob was hit (set by main.js). */
+    this.onAttack = null;
+    /** Optional hook: (id, count, blockPos) — spawn a ground drop instead of
+     *  direct inventory pickup. Set by main.js. */
+    this.onBlockDrop = null;
 
     // ---- Selection wireframe ----
     const boxGeo = new THREE.BoxGeometry(1.002, 1.002, 1.002);
@@ -61,7 +66,13 @@ export class Interaction {
   _bindInput() {
     document.addEventListener('mousedown', (e) => {
       if (!this.player.enabled) return;
-      if (e.button === 0) this.buttons.left = true;
+      if (e.button === 0) {
+        // A swing first checks for a mob — hitting one doesn't mine the
+        // block behind it
+        const dmg = attackDamage(this.inventory.selectedItem()?.id);
+        if (this.onAttack?.(dmg)) { this._resetBreaking(); return; }
+        this.buttons.left = true;
+      }
       if (e.button === 2) { this.buttons.right = true; this.tryPlace(); }
     });
     document.addEventListener('mouseup', (e) => {
@@ -194,18 +205,38 @@ export class Interaction {
   breakBlock(pos, id) {
     this.world.setBlock(pos.x, pos.y, pos.z, BLOCK.AIR);
 
-    // Breaking a chest hands you its contents (no item entities yet)
+    const give = (itemId, count) => {
+      if (this.onBlockDrop) this.onBlockDrop(itemId, count, pos);
+      else this.inventory.add(itemId, count);
+    };
+
+    // Breaking a chest/furnace spills its contents
     if (id === BLOCK.CHEST) {
       const key = `${pos.x},${pos.y},${pos.z}`;
-      for (const s of this.world.removeChest(key)) this.inventory.add(s.id, s.count);
+      for (const s of this.world.removeChest(key)) give(s.id, s.count);
       this.onChestBroken?.(key);
     }
+    if (id === BLOCK.FURNACE) {
+      const key = `${pos.x},${pos.y},${pos.z}`;
+      for (const s of this.world.removeFurnace(key)) give(s.id, s.count);
+    }
 
-    this.inventory.add(blockDrop(id), 1);
+    // Creative mode breaks silently into nothing (like Minecraft)
+    if (!this.player.creative) give(blockDrop(id), 1);
     this.audio?.breakBlock(id);
   }
 
   tryPlace() {
+    // Eating works anywhere, even pointing at the sky
+    const held = this.inventory.selectedItem();
+    if (held && itemDef(held.id).food && this.player.hunger < 19.5) {
+      this.player.hunger = Math.min(20, this.player.hunger + itemDef(held.id).food);
+      this.inventory.consumeSelected();
+      this.audio?.play('eat');
+      this.placeCooldown = 0.45;
+      return;
+    }
+
     if (!this.target) return;
 
     // Interactive blocks (crafting table) open on right click unless crouching

@@ -18,6 +18,7 @@ const CRAFT_BASE = 100;   // craft grid cells are CRAFT_BASE + i (i in 0..8)
 const RESULT_INDEX = 200; // crafting result slot
 const CHEST_BASE = 400;   // open-chest slots are CHEST_BASE + i (i in 0..26)
 const CREATIVE_BASE = 600;// creative palette entries
+const FURNACE_BASE = 700; // furnace slots: 700 input, 701 fuel, 702 output
 
 export class Inventory {
   constructor(atlas, audio) {
@@ -37,6 +38,8 @@ export class Inventory {
     /** Open chest: reference to a 27-slot array (world/chest storage). */
     this.chest = null;
     this.onChestChange = null;   // callback after any chest slot changes
+    /** Open furnace: reference to {slots:[in,fuel,out], progress, burn}. */
+    this.furnace = null;
     this.creativeMode = false;
 
     this._iconCache = new Map();
@@ -50,6 +53,12 @@ export class Inventory {
       craftBlock: document.getElementById('craft-block'),
       chestArea: document.getElementById('chest-area'),
       chestGrid: document.getElementById('chest-grid'),
+      furnaceArea: document.getElementById('furnace-area'),
+      furnaceIn: document.getElementById('furnace-in'),
+      furnaceFuel: document.getElementById('furnace-fuel'),
+      furnaceOut: document.getElementById('furnace-out'),
+      furnaceFlame: document.getElementById('furnace-flame'),
+      furnaceFill: document.getElementById('furnace-progress-fill'),
       creativeArea: document.getElementById('creative-area'),
       creativeGrid: document.getElementById('creative-grid'),
       drag: document.getElementById('drag-item'),
@@ -120,6 +129,9 @@ export class Inventory {
     for (let i = 0; i < 9; i++) craftGrid.appendChild(this._makeSlot(CRAFT_BASE + i, true));
     craftResult.appendChild(this._makeSlot(RESULT_INDEX, true));
     for (let i = 0; i < 27; i++) this._els.chestGrid.appendChild(this._makeSlot(CHEST_BASE + i, true));
+    this._els.furnaceIn.appendChild(this._makeSlot(FURNACE_BASE, true));
+    this._els.furnaceFuel.appendChild(this._makeSlot(FURNACE_BASE + 1, true));
+    this._els.furnaceOut.appendChild(this._makeSlot(FURNACE_BASE + 2, true));
 
     // Creative palette: every real block + item, one slot each
     this._creativeIds = [
@@ -175,11 +187,31 @@ export class Inventory {
       return;
     }
 
-    // Route to the right backing array (main slots / craft grid / open chest)
-    const isChest = index >= CHEST_BASE && index < CREATIVE_BASE;
-    const isCraft = !isChest && index >= CRAFT_BASE;
-    const arr = isChest ? this.chest : isCraft ? this.craft : this.slots;
-    const i = isChest ? index - CHEST_BASE : isCraft ? index - CRAFT_BASE : index;
+    // Furnace output: take-only (pick up or merge into held stack)
+    if (index === FURNACE_BASE + 2) {
+      if (!this.furnace) return;
+      const out = this.furnace.slots[2];
+      if (!out) return;
+      if (!this.dragging) { this.dragging = out; this.furnace.slots[2] = null; }
+      else if (this.dragging.id === out.id && this.dragging.count + out.count <= maxStack(out.id)) {
+        this.dragging.count += out.count;
+        this.furnace.slots[2] = null;
+      } else return;
+      this.audio?.play('click');
+      this.renderAll();
+      return;
+    }
+
+    // Route to the right backing array (slots / craft grid / chest / furnace)
+    const isFurnace = index >= FURNACE_BASE;
+    const isChest = !isFurnace && index >= CHEST_BASE && index < CREATIVE_BASE;
+    const isCraft = !isFurnace && !isChest && index >= CRAFT_BASE;
+    const arr = isFurnace ? this.furnace?.slots
+              : isChest ? this.chest
+              : isCraft ? this.craft : this.slots;
+    const i = isFurnace ? index - FURNACE_BASE
+            : isChest ? index - CHEST_BASE
+            : isCraft ? index - CRAFT_BASE : index;
     if (!arr) return;
     const slot = arr[i];
 
@@ -302,8 +334,9 @@ export class Inventory {
       this._applyCraftSize();
       this._updateResult();
       this._els.chestArea.classList.toggle('hidden', !this.chest);
-      this._els.craftBlock.classList.toggle('hidden', !!this.chest);
-      this._els.creativeArea.classList.toggle('hidden', !this.creativeMode || !!this.chest);
+      this._els.furnaceArea.classList.toggle('hidden', !this.furnace);
+      this._els.craftBlock.classList.toggle('hidden', !!this.chest || !!this.furnace);
+      this._els.creativeArea.classList.toggle('hidden', !this.creativeMode || !!this.chest || !!this.furnace);
     } else {
       this._dumpCraftGrid();             // don't lose items left in the grid
       if (this.dragging) {               // drop held stack back into inventory
@@ -312,6 +345,7 @@ export class Inventory {
       }
       this.chest = null;
       this.onChestChange = null;
+      this.furnace = null;
     }
     this.renderAll();
     return this.open;
@@ -323,6 +357,26 @@ export class Inventory {
     this.onChestChange = onChange || null;
     this.open = false;       // force toggle() into the "opening" branch
     this.toggle();
+  }
+
+  /** Open the inventory with a furnace attached. */
+  openFurnace(furnaceState) {
+    this.furnace = furnaceState;
+    this.open = false;
+    this.toggle();
+  }
+
+  /** Live furnace display (called each frame by main while open). */
+  updateFurnaceView() {
+    if (!this.open || !this.furnace) return;
+    this._els.furnaceFlame.classList.toggle('lit', this.furnace.burn > 0);
+    this._els.furnaceFill.style.width = `${Math.min(100, (this.furnace.progress / 5) * 100)}%`;
+  }
+
+  /** Wipe everything (death). */
+  clearAll() {
+    this.slots.fill(null);
+    this.renderAll();
   }
 
   setCreative(on) { this.creativeMode = !!on; }
@@ -400,6 +454,11 @@ export class Inventory {
     if (this.chest) {
       [...this._els.chestGrid.children].forEach((el, i) =>
         this._renderSlot(el, this.chest[i], false));
+    }
+    if (this.furnace) {
+      this._renderSlot(this._els.furnaceIn.firstChild, this.furnace.slots[0], false);
+      this._renderSlot(this._els.furnaceFuel.firstChild, this.furnace.slots[1], false);
+      this._renderSlot(this._els.furnaceOut.firstChild, this.furnace.slots[2], false);
     }
     if (this.creativeMode && !this._creativeRendered) {
       [...this._els.creativeGrid.children].forEach((el, i) =>

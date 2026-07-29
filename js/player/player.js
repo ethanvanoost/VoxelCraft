@@ -292,6 +292,7 @@ export class Player {
 
   die() {
     this.dead = true;
+    this.onDeath?.(this.position.clone());   // main.js: scatter inventory as drops
     // Simple respawn after a moment at the surface
     setTimeout(() => {
       const y = this.world.surfaceHeight(0, 0) + 2;

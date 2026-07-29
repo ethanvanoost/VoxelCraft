@@ -6,7 +6,7 @@
 
 import * as THREE from 'three';
 import { CONFIG } from '../core/config.js';
-import { BLOCK, isSolid, isLiquid } from '../core/blocks.js';
+import { BLOCK, isSolid, isLiquid, SMELT, FUEL_SECONDS } from '../core/blocks.js';
 import { Chunk } from './chunk.js';
 import { WorldGen } from './worldgen.js';
 
@@ -26,6 +26,7 @@ export class World {
     this.chunks = new Map();          // "cx,cz" -> Chunk
     this.edits = {};                  // "x,y,z" -> block id (player modifications)
     this.chests = {};                 // "x,y,z" -> array(27) of {id,count}|null
+    this.furnaces = {};               // "x,y,z" -> {slots:[in,fuel,out], progress, burn}
     this.onEdit = null;               // hook: (x, y, z, id) after a player edit (multiplayer sync)
     this.renderDistance = CONFIG.RENDER_DISTANCE;
     this.genQueue = [];               // chunks waiting for generation+mesh
@@ -226,6 +227,64 @@ export class World {
       chunk.meshes = null;
     }
     if (!keepData) chunk.generated = false;
+  }
+
+  /** Furnace state at a position (created on first open). */
+  getFurnace(posKey) {
+    if (!this.furnaces) this.furnaces = {};
+    if (!this.furnaces[posKey]) {
+      this.furnaces[posKey] = { slots: [null, null, null], progress: 0, burn: 0 };
+    }
+    return this.furnaces[posKey];
+  }
+
+  removeFurnace(posKey) {
+    if (!this.furnaces?.[posKey]) return [];
+    const contents = this.furnaces[posKey].slots.filter(Boolean);
+    delete this.furnaces[posKey];
+    return contents;
+  }
+
+  /** Advance all furnaces: consume fuel, smelt input → output (5 s each). */
+  tickFurnaces(dt) {
+    if (!this.furnaces) return false;
+    let changed = false;
+    for (const state of Object.values(this.furnaces)) {
+      const input = state.slots[0];
+      const recipe = input ? SMELT[input.id] : undefined;
+      const out = state.slots[2];
+      const outFree = recipe !== undefined && (!out || (out.id === recipe && out.count < 64));
+
+      if (state.burn > 0) state.burn -= dt;
+
+      if (recipe !== undefined && outFree) {
+        if (state.burn <= 0) {
+          // light more fuel
+          const fuel = state.slots[1];
+          const secs = fuel ? FUEL_SECONDS[fuel.id] : undefined;
+          if (secs) {
+            state.burn += secs;
+            if (--fuel.count <= 0) state.slots[1] = null;
+            changed = true;
+          }
+        }
+        if (state.burn > 0) {
+          state.progress += dt;
+          if (state.progress >= 5) {
+            state.progress = 0;
+            if (!out) state.slots[2] = { id: recipe, count: 1 };
+            else out.count++;
+            if (--input.count <= 0) state.slots[0] = null;
+            changed = true;
+          }
+        } else {
+          state.progress = 0;
+        }
+      } else {
+        state.progress = 0;
+      }
+    }
+    return changed;
   }
 
   /** Chest contents at a position (created empty on first open). */

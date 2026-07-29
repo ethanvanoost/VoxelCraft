@@ -37,6 +37,7 @@ export class SaveSystem {
         seed: this.world.seed,
         edits: this.mpMode ? {} : this.world.edits,
         chests: this.mpMode ? {} : this.world.chests,
+        furnaces: this.world.furnaces,
         time: this.sky.time,
         player: {
           pos: this.player.position.toArray(),
@@ -71,6 +72,7 @@ export class SaveSystem {
       this.world.edits = data.edits || {};
       this.world.chests = data.chests || {};
     }
+    this.world.furnaces = data.furnaces || {};
     if (data.time !== undefined) this.sky.time = data.time;
     if (data.player) {
       this.player.position.fromArray(data.player.pos);

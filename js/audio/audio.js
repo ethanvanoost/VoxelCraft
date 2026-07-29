@@ -112,6 +112,12 @@ export class AudioEngine {
       case 'hurt':   this._tone({ freq: 220, dur: 0.18, gain: 0.2, type: 'sawtooth', slide: -120 }); break;
       case 'click':  this._tone({ freq: 800, dur: 0.03, gain: 0.08 }); break;
       case 'splash': this._noise({ freq: 900, dur: 0.35, gain: 0.3, q: 2, drop: 600 }); break;
+      case 'pop':    this._tone({ freq: 500, dur: 0.07, gain: 0.15, type: 'sine', slide: 400 }); break;
+      case 'eat':
+        this._noise({ freq: 600, dur: 0.09, gain: 0.25, q: 2 });
+        setTimeout(() => this._noise({ freq: 500, dur: 0.09, gain: 0.22, q: 2 }), 130);
+        setTimeout(() => this._noise({ freq: 550, dur: 0.09, gain: 0.2, q: 2 }), 260);
+        break;
     }
   }
 

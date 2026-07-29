@@ -321,6 +321,26 @@ PAINTERS.diamond_item = (ctx, x, y) => {
   ctx.fillRect(x + 6, y + 5, 2, 2);          // sparkle
 };
 
+// ---- Food sprites ----
+function meatPainter(rawR, rawG, rawB, cooked) {
+  return (ctx, x, y) => {
+    ctx.clearRect(x, y, TILE, TILE);
+    const base = cooked ? [146, 92, 50] : [rawR, rawG, rawB];
+    ctx.fillStyle = `rgb(${base[0]},${base[1]},${base[2]})`;
+    ctx.fillRect(x + 3, y + 5, 10, 7);         // meat body
+    ctx.fillRect(x + 5, y + 3, 6, 2);
+    ctx.fillStyle = cooked ? 'rgb(180,120,70)' : 'rgb(240,190,190)';
+    ctx.fillRect(x + 5, y + 6, 4, 2);          // fat / sear marks
+    ctx.fillRect(x + 10, y + 9, 2, 2);
+    ctx.fillStyle = cooked ? 'rgb(100,60,30)' : `rgb(${base[0] - 40},${base[1] - 20},${base[2] - 20})`;
+    ctx.fillRect(x + 3, y + 11, 10, 1);        // bottom shade
+  };
+}
+PAINTERS.raw_porkchop = meatPainter(240, 130, 140, false);
+PAINTERS.cooked_porkchop = meatPainter(0, 0, 0, true);
+PAINTERS.raw_beef = meatPainter(200, 60, 60, false);
+PAINTERS.steak = meatPainter(0, 0, 0, true);
+
 // ---- Tool sprites: 8×8 pixel maps scaled ×2. H = head, S = handle ----
 const TOOL_SHAPES = {
   pickaxe: [

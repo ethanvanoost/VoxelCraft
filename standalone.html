@@ -211,6 +211,24 @@ html, body {
 }
 #creative-grid { max-height: 220px; overflow-y: auto; }
 
+/* ---------------- Furnace ---------------- */
+#furnace-row {
+  display: flex; align-items: center; gap: 18px;
+  margin-bottom: 12px;
+}
+#furnace-col { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+#furnace-flame { font-size: 18px; filter: grayscale(1) brightness(0.5); }
+#furnace-flame.lit { filter: none; }
+#furnace-progress {
+  width: 60px; height: 10px;
+  border: 2px solid #373737;
+  background: #8b8b8b;
+}
+#furnace-progress-fill {
+  height: 100%; width: 0%;
+  background: #e0e0e0;
+}
+
 /* ---------------- Menu (Minecraft-style) ---------------- */
 #menu {
   /* dirt-tile background is generated at runtime and set by menu.js */
@@ -371,6 +389,18 @@ html, body {
     <div id="chest-area" class="hidden">
       <div class="inv-title">Chest</div>
       <div id="chest-grid"></div>
+    </div>
+    <div id="furnace-area" class="hidden">
+      <div class="inv-title">Furnace</div>
+      <div id="furnace-row">
+        <div id="furnace-col">
+          <div id="furnace-in"></div>
+          <div id="furnace-flame">🔥</div>
+          <div id="furnace-fuel"></div>
+        </div>
+        <div id="furnace-progress"><div id="furnace-progress-fill"></div></div>
+        <div id="furnace-out"></div>
+      </div>
     </div>
     <div id="craft-block">
       <div class="inv-title">Crafting</div>
@@ -860,6 +890,7 @@ const ITEM_DEFS = {
 const TOOL_TIERS = ['wooden', 'stone', 'iron', 'golden', 'diamond'];
 const TOOL_TYPES = ['pickaxe', 'axe', 'shovel', 'sword', 'hoe'];
 const TOOL_SPEED = { wooden: 2, stone: 4, iron: 6, golden: 12, diamond: 8 };
+const SWORD_DMG = { wooden: 4, stone: 5, iron: 6, golden: 4, diamond: 7 };
 
 // Generate the 25 tool items (ids 300..324), e.g. ITEM.DIAMOND_PICKAXE
 {
@@ -872,10 +903,47 @@ const TOOL_SPEED = { wooden: 2, stone: 4, iron: 6, golden: 12, diamond: 8 };
         icon: `${tier}_${type}`,
         stack: 1,
         tool: { type, speed: TOOL_SPEED[tier] },
+        // Combat: swords hit hardest, axes almost as hard
+        attack: type === 'sword' ? SWORD_DMG[tier] : type === 'axe' ? SWORD_DMG[tier] - 1 : 1,
       };
       id++;
     }
   }
+}
+
+// ---- Food (dropped by mobs; cook in a furnace, right-click to eat) ----
+ITEM.RAW_PORKCHOP = 270;
+ITEM.COOKED_PORKCHOP = 271;
+ITEM.RAW_BEEF = 272;
+ITEM.STEAK = 273;
+ITEM_DEFS[ITEM.RAW_PORKCHOP]    = { name: 'Raw Porkchop',    icon: 'raw_porkchop',    food: 3 };
+ITEM_DEFS[ITEM.COOKED_PORKCHOP] = { name: 'Cooked Porkchop', icon: 'cooked_porkchop', food: 8 };
+ITEM_DEFS[ITEM.RAW_BEEF]        = { name: 'Raw Beef',        icon: 'raw_beef',        food: 3 };
+ITEM_DEFS[ITEM.STEAK]           = { name: 'Steak',           icon: 'steak',           food: 8 };
+
+/** Furnace: what smelts into what. */
+const SMELT = {
+  [ITEM.RAW_PORKCHOP]: ITEM.COOKED_PORKCHOP,
+  [ITEM.RAW_BEEF]: ITEM.STEAK,
+  [BLOCK.LOG]: ITEM.COAL,          // charcoal
+};
+
+/** Furnace fuels → burn time in seconds (one smelt takes 5 s). */
+const FUEL_SECONDS = {
+  [ITEM.COAL]: 40,
+  [BLOCK.COAL_BLOCK]: 400,
+  [BLOCK.LOG]: 15,
+  [BLOCK.PLANKS]: 7.5,
+  [ITEM.STICK]: 2.5,
+  [BLOCK.CRAFTING_TABLE]: 15,
+  [BLOCK.CHEST]: 15,
+  [ITEM.WOODEN_PICKAXE]: 10, [ITEM.WOODEN_AXE]: 10, [ITEM.WOODEN_SHOVEL]: 10,
+  [ITEM.WOODEN_SWORD]: 10, [ITEM.WOODEN_HOE]: 10,
+};
+
+/** Melee damage for the held item id (fist = 1). */
+function attackDamage(id) {
+  return (id && ITEM_DEFS[id]?.attack) || 1;
 }
 
 // Ore drops: mining an ore yields its refined material directly
@@ -1255,6 +1323,26 @@ PAINTERS.diamond_item = (ctx, x, y) => {
   ctx.fillStyle = 'rgb(190,255,252)';
   ctx.fillRect(x + 6, y + 5, 2, 2);          // sparkle
 };
+
+// ---- Food sprites ----
+function meatPainter(rawR, rawG, rawB, cooked) {
+  return (ctx, x, y) => {
+    ctx.clearRect(x, y, TILE, TILE);
+    const base = cooked ? [146, 92, 50] : [rawR, rawG, rawB];
+    ctx.fillStyle = `rgb(${base[0]},${base[1]},${base[2]})`;
+    ctx.fillRect(x + 3, y + 5, 10, 7);         // meat body
+    ctx.fillRect(x + 5, y + 3, 6, 2);
+    ctx.fillStyle = cooked ? 'rgb(180,120,70)' : 'rgb(240,190,190)';
+    ctx.fillRect(x + 5, y + 6, 4, 2);          // fat / sear marks
+    ctx.fillRect(x + 10, y + 9, 2, 2);
+    ctx.fillStyle = cooked ? 'rgb(100,60,30)' : `rgb(${base[0] - 40},${base[1] - 20},${base[2] - 20})`;
+    ctx.fillRect(x + 3, y + 11, 10, 1);        // bottom shade
+  };
+}
+PAINTERS.raw_porkchop = meatPainter(240, 130, 140, false);
+PAINTERS.cooked_porkchop = meatPainter(0, 0, 0, true);
+PAINTERS.raw_beef = meatPainter(200, 60, 60, false);
+PAINTERS.steak = meatPainter(0, 0, 0, true);
 
 // ---- Tool sprites: 8×8 pixel maps scaled ×2. H = head, S = handle ----
 const TOOL_SHAPES = {
@@ -2045,6 +2133,7 @@ class World {
     this.chunks = new Map();          // "cx,cz" -> Chunk
     this.edits = {};                  // "x,y,z" -> block id (player modifications)
     this.chests = {};                 // "x,y,z" -> array(27) of {id,count}|null
+    this.furnaces = {};               // "x,y,z" -> {slots:[in,fuel,out], progress, burn}
     this.onEdit = null;               // hook: (x, y, z, id) after a player edit (multiplayer sync)
     this.renderDistance = CONFIG.RENDER_DISTANCE;
     this.genQueue = [];               // chunks waiting for generation+mesh
@@ -2245,6 +2334,64 @@ class World {
       chunk.meshes = null;
     }
     if (!keepData) chunk.generated = false;
+  }
+
+  /** Furnace state at a position (created on first open). */
+  getFurnace(posKey) {
+    if (!this.furnaces) this.furnaces = {};
+    if (!this.furnaces[posKey]) {
+      this.furnaces[posKey] = { slots: [null, null, null], progress: 0, burn: 0 };
+    }
+    return this.furnaces[posKey];
+  }
+
+  removeFurnace(posKey) {
+    if (!this.furnaces?.[posKey]) return [];
+    const contents = this.furnaces[posKey].slots.filter(Boolean);
+    delete this.furnaces[posKey];
+    return contents;
+  }
+
+  /** Advance all furnaces: consume fuel, smelt input → output (5 s each). */
+  tickFurnaces(dt) {
+    if (!this.furnaces) return false;
+    let changed = false;
+    for (const state of Object.values(this.furnaces)) {
+      const input = state.slots[0];
+      const recipe = input ? SMELT[input.id] : undefined;
+      const out = state.slots[2];
+      const outFree = recipe !== undefined && (!out || (out.id === recipe && out.count < 64));
+
+      if (state.burn > 0) state.burn -= dt;
+
+      if (recipe !== undefined && outFree) {
+        if (state.burn <= 0) {
+          // light more fuel
+          const fuel = state.slots[1];
+          const secs = fuel ? FUEL_SECONDS[fuel.id] : undefined;
+          if (secs) {
+            state.burn += secs;
+            if (--fuel.count <= 0) state.slots[1] = null;
+            changed = true;
+          }
+        }
+        if (state.burn > 0) {
+          state.progress += dt;
+          if (state.progress >= 5) {
+            state.progress = 0;
+            if (!out) state.slots[2] = { id: recipe, count: 1 };
+            else out.count++;
+            if (--input.count <= 0) state.slots[0] = null;
+            changed = true;
+          }
+        } else {
+          state.progress = 0;
+        }
+      } else {
+        state.progress = 0;
+      }
+    }
+    return changed;
   }
 
   /** Chest contents at a position (created empty on first open). */
@@ -2453,6 +2600,353 @@ class Net {
         f.remove(myRef).catch(() => {});
       },
     };
+  }
+}
+
+// ============ js/entities/drops.js ============
+/**
+ * Ground item drops: mined blocks and thrown/death items become small
+ * spinning entities that fall, bob, and are magnetically picked up when the
+ * player walks near. (Drops are local — not synced in multiplayer.)
+ */
+
+
+
+
+const GRAVITY = -18;
+const PICKUP_DIST = 1.1;
+const MAGNET_DIST = 2.2;
+const DESPAWN = 300;      // seconds
+
+class Drops {
+  constructor(scene, world, atlas, audio) {
+    this.scene = scene;
+    this.world = world;
+    this.atlas = atlas;
+    this.audio = audio;
+    this.items = [];
+    this._matCache = new Map();
+    this._blockGeo = new THREE.BoxGeometry(0.3, 0.3, 0.3);
+  }
+
+  _material(id) {
+    if (this._matCache.has(id)) return this._matCache.get(id);
+    let entry;
+    if (isPlaceable(id)) {
+      const tex = new THREE.CanvasTexture(this.atlas.tileCanvas(faceTile(id, 'side')));
+      tex.magFilter = THREE.NearestFilter;
+      tex.minFilter = THREE.NearestFilter;
+      entry = { block: true, mat: new THREE.MeshLambertMaterial({ map: tex }) };
+    } else {
+      const tex = new THREE.CanvasTexture(this.atlas.tileCanvas(itemDef(id).icon || 'stone'));
+      tex.magFilter = THREE.NearestFilter;
+      tex.minFilter = THREE.NearestFilter;
+      entry = { block: false, mat: new THREE.SpriteMaterial({ map: tex, transparent: true }) };
+    }
+    this._matCache.set(id, entry);
+    return entry;
+  }
+
+  /**
+   * Spawn a drop.
+   * @param vel optional initial velocity (thrown items)
+   * @param noPickupFor seconds before the player can pick it up
+   */
+  spawn(id, count, pos, vel = null, noPickupFor = 0.6) {
+    const { block, mat } = this._material(id);
+    let mesh;
+    if (block) {
+      mesh = new THREE.Mesh(this._blockGeo, mat);
+      mesh.castShadow = true;
+    } else {
+      mesh = new THREE.Sprite(mat);
+      mesh.scale.set(0.45, 0.45, 1);
+    }
+    mesh.position.copy(pos);
+    this.scene.add(mesh);
+    this.items.push({
+      id, count, mesh,
+      pos: pos.clone(),
+      vel: vel ? vel.clone() : new THREE.Vector3((Math.random() - 0.5) * 2, 3, (Math.random() - 0.5) * 2),
+      age: 0,
+      noPickupFor,
+      spin: Math.random() * Math.PI * 2,
+    });
+  }
+
+  /** Throw one unit of the selected hotbar item in the look direction. */
+  throwFromPlayer(player, inventory) {
+    const slot = inventory.selectedItem();
+    if (!slot) return;
+    const dir = player.getLookDirection();
+    const pos = player.camera.position.clone().addScaledVector(dir, 0.4);
+    this.spawn(slot.id, 1, pos, dir.clone().multiplyScalar(7).add(new THREE.Vector3(0, 2, 0)), 1.4);
+    inventory.consumeSelected();
+    this.audio?.play('click');
+  }
+
+  /** Scatter an entire inventory at a position (death). */
+  scatterAll(inventory, pos) {
+    for (let i = 0; i < inventory.slots.length; i++) {
+      const s = inventory.slots[i];
+      if (!s) continue;
+      const vel = new THREE.Vector3((Math.random() - 0.5) * 5, 3 + Math.random() * 3, (Math.random() - 0.5) * 5);
+      this.spawn(s.id, s.count, pos.clone().add(new THREE.Vector3(0, 1, 0)), vel, 2);
+      inventory.slots[i] = null;
+    }
+    inventory.renderAll();
+  }
+
+  update(dt, player, inventory) {
+    const ppos = player.position;
+    for (let i = this.items.length - 1; i >= 0; i--) {
+      const d = this.items[i];
+      d.age += dt;
+      if (d.age > DESPAWN) { this._remove(i); continue; }
+
+      // Physics: gravity + simple voxel collision
+      d.vel.y += GRAVITY * dt;
+      const next = d.pos.clone().addScaledVector(d.vel, dt);
+      if (this.world.isSolidAt(next.x, d.pos.y + 0.1, next.z)) { d.vel.x = 0; d.vel.z = 0; }
+      else { d.pos.x = next.x; d.pos.z = next.z; }
+      if (this.world.isSolidAt(d.pos.x, next.y, d.pos.z)) {
+        d.vel.y = 0;
+        d.vel.x *= 0.7; d.vel.z *= 0.7;                  // ground friction
+        d.pos.y = Math.floor(next.y) + 1.001;
+      } else {
+        d.pos.y = next.y;
+      }
+      if (d.pos.y < -20) { this._remove(i); continue; }  // fell out of world
+
+      // Magnet + pickup
+      const target = new THREE.Vector3(ppos.x, ppos.y + 0.6, ppos.z);
+      const dist = d.pos.distanceTo(target);
+      if (d.age > d.noPickupFor && !player.dead) {
+        if (dist < PICKUP_DIST) {
+          const leftover = inventory.add(d.id, d.count);
+          if (leftover > 0) d.count = leftover;          // inventory full: keep the rest
+          else { this._remove(i); this.audio?.play('pop'); continue; }
+        } else if (dist < MAGNET_DIST) {
+          d.pos.addScaledVector(target.clone().sub(d.pos).normalize(), dt * 5);
+        }
+      }
+
+      // Visuals: spin + bob
+      d.spin += dt * 2;
+      d.mesh.position.set(d.pos.x, d.pos.y + 0.2 + Math.sin(d.age * 2.5) * 0.06, d.pos.z);
+      if (d.mesh.isMesh) d.mesh.rotation.y = d.spin;
+    }
+  }
+
+  _remove(i) {
+    this.scene.remove(this.items[i].mesh);
+    this.items.splice(i, 1);
+  }
+}
+
+// ============ js/entities/mobs.js ============
+/**
+ * Passive mobs (pigs and cows): wander the surface, take melee hits with
+ * knockback (swords/axes hit harder), and drop raw meat on death.
+ * Mobs are local to your game — not synced in multiplayer.
+ */
+
+
+
+
+const MOB_TYPES = {
+  pig: {
+    body: 0xeaa0a8, snout: 0xd98a92, health: 10, scale: 1,
+    drop: ITEM.RAW_PORKCHOP,
+  },
+  cow: {
+    body: 0x6b4a33, snout: 0xcfc5bb, health: 12, scale: 1.15,
+    drop: ITEM.RAW_BEEF,
+  },
+};
+
+const MAX_MOBS = 10;
+const SPAWN_MIN = 20, SPAWN_MAX = 44;
+const DESPAWN_DIST = 70;
+
+class Mob {
+  constructor(type, pos) {
+    this.type = type;
+    const def = MOB_TYPES[type];
+    this.def = def;
+    this.pos = pos.clone();
+    this.vel = new THREE.Vector3();
+    this.yaw = Math.random() * Math.PI * 2;
+    this.health = def.health;
+    this.hurtTimer = 0;
+    this.aiTimer = 0;
+    this.moving = false;
+    this.walkPhase = 0;
+
+    // ---- Box model ----
+    const s = def.scale;
+    const g = new THREE.Group();
+    this.bodyMat = new THREE.MeshLambertMaterial({ color: def.body });
+    const snoutMat = new THREE.MeshLambertMaterial({ color: def.snout });
+    const body = new THREE.Mesh(new THREE.BoxGeometry(0.7 * s, 0.55 * s, 1.1 * s), this.bodyMat);
+    body.position.y = 0.65 * s;
+    const head = new THREE.Mesh(new THREE.BoxGeometry(0.5 * s, 0.5 * s, 0.45 * s), this.bodyMat);
+    head.position.set(0, 0.85 * s, 0.7 * s);
+    const snout = new THREE.Mesh(new THREE.BoxGeometry(0.24 * s, 0.16 * s, 0.1 * s), snoutMat);
+    snout.position.set(0, 0.78 * s, 0.94 * s);
+    this.legs = [];
+    for (const [lx, lz] of [[-0.22, 0.35], [0.22, 0.35], [-0.22, -0.35], [0.22, -0.35]]) {
+      const leg = new THREE.Mesh(new THREE.BoxGeometry(0.18 * s, 0.4 * s, 0.18 * s), this.bodyMat);
+      leg.position.set(lx * s, 0.2 * s, lz * s);
+      this.legs.push(leg);
+      g.add(leg);
+    }
+    g.add(body, head, snout);
+    g.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+    this.group = g;
+  }
+
+  /** AABB half-extents for collision & hit detection. */
+  get halfW() { return 0.4 * this.def.scale; }
+  get height() { return 0.95 * this.def.scale; }
+
+  collides(world, p) {
+    const hw = this.halfW;
+    for (const dx of [-hw, hw]) for (const dz of [-hw, hw]) {
+      for (let y = 0.05; y < this.height; y += 0.45) {
+        if (world.isSolidAt(p.x + dx, p.y + y, p.z + dz)) return true;
+      }
+    }
+    return false;
+  }
+
+  update(dt, world) {
+    // ---- Wander AI ----
+    this.aiTimer -= dt;
+    if (this.aiTimer <= 0) {
+      this.aiTimer = 1.5 + Math.random() * 3.5;
+      this.moving = Math.random() < 0.6;
+      this.yaw += (Math.random() - 0.5) * Math.PI * 1.5;
+    }
+    this.hurtTimer = Math.max(0, this.hurtTimer - dt);
+    this.bodyMat.color.setHex(this.hurtTimer > 0 ? 0xff5050 : this.def.body);
+
+    const speed = this.moving ? 1.3 : 0;
+    const kb = this.vel.length() > 2;   // during knockback keep momentum
+    if (!kb) {
+      this.vel.x = -Math.sin(this.yaw) * speed;
+      this.vel.z = -Math.cos(this.yaw) * speed;
+    }
+    this.vel.y += -26 * dt;
+    this.vel.y = Math.max(this.vel.y, -40);
+
+    // ---- Move with per-axis collision + 1-block step-up ----
+    const p = this.pos;
+    const step = (axis, delta) => {
+      p[axis] += delta;
+      if (this.collides(world, p)) {
+        p.y += 1.02;
+        if (!this.collides(world, p)) return;    // stepped up
+        p.y -= 1.02;
+        p[axis] -= delta;
+        if (!kb) this.yaw += Math.PI / 2 + Math.random();  // bounced: turn away
+      }
+    };
+    step('x', this.vel.x * dt);
+    step('z', this.vel.z * dt);
+    p.y += this.vel.y * dt;
+    if (this.collides(world, p)) {
+      p.y -= this.vel.y * dt;
+      if (this.vel.y < 0) { this.vel.x *= 0.6; this.vel.z *= 0.6; }
+      this.vel.y = 0;
+    }
+
+    // ---- Animate ----
+    this.walkPhase += dt * speed * 5;
+    const swing = Math.sin(this.walkPhase) * 0.6 * (speed > 0 ? 1 : 0);
+    this.legs[0].rotation.x = swing; this.legs[3].rotation.x = swing;
+    this.legs[1].rotation.x = -swing; this.legs[2].rotation.x = -swing;
+    this.group.position.copy(p);
+    this.group.rotation.y = this.yaw;
+  }
+
+  hurt(dmg, knockDir) {
+    this.health -= dmg;
+    this.hurtTimer = 0.35;
+    this.vel.add(knockDir.clone().setY(0).normalize().multiplyScalar(6)).y = 4.5;
+    return this.health <= 0;
+  }
+}
+
+class MobManager {
+  constructor(scene, world, drops, audio) {
+    this.scene = scene;
+    this.world = world;
+    this.drops = drops;
+    this.audio = audio;
+    this.mobs = [];
+    this.spawnTimer = 0;
+  }
+
+  update(dt, playerPos) {
+    // ---- Spawning on grass around the player ----
+    this.spawnTimer -= dt;
+    if (this.spawnTimer <= 0 && this.mobs.length < MAX_MOBS) {
+      this.spawnTimer = 2;
+      const ang = Math.random() * Math.PI * 2;
+      const dist = SPAWN_MIN + Math.random() * (SPAWN_MAX - SPAWN_MIN);
+      const x = Math.floor(playerPos.x + Math.cos(ang) * dist);
+      const z = Math.floor(playerPos.z + Math.sin(ang) * dist);
+      const y = this.world.surfaceHeight(x, z);
+      const ground = this.world.getBlock(x, y, z);
+      if (ground === BLOCK.GRASS || ground === BLOCK.SNOW_GRASS) {
+        const type = Math.random() < 0.5 ? 'pig' : 'cow';
+        const mob = new Mob(type, new THREE.Vector3(x + 0.5, y + 1.2, z + 0.5));
+        this.scene.add(mob.group);
+        this.mobs.push(mob);
+      }
+    }
+
+    for (let i = this.mobs.length - 1; i >= 0; i--) {
+      const mob = this.mobs[i];
+      if (mob.pos.distanceTo(playerPos) > DESPAWN_DIST || mob.pos.y < -20) {
+        this._remove(i);
+        continue;
+      }
+      mob.update(dt, this.world);
+    }
+  }
+
+  /**
+   * Melee swing: ray-march from origin along dir; first mob AABB hit takes
+   * damage + knockback. Returns true if something was hit.
+   */
+  attack(origin, dir, reach, dmg) {
+    for (let t = 0.3; t <= reach; t += 0.25) {
+      const px = origin.x + dir.x * t, py = origin.y + dir.y * t, pz = origin.z + dir.z * t;
+      for (let i = 0; i < this.mobs.length; i++) {
+        const m = this.mobs[i];
+        const hw = m.halfW + 0.15;
+        if (px > m.pos.x - hw && px < m.pos.x + hw &&
+            pz > m.pos.z - hw && pz < m.pos.z + hw &&
+            py > m.pos.y - 0.1 && py < m.pos.y + m.height + 0.15) {
+          this.audio?.play('hurt');
+          if (m.hurt(dmg, dir)) {
+            // death: drop 1-2 meat
+            const count = 1 + (Math.random() < 0.5 ? 1 : 0);
+            this.drops.spawn(m.def.drop, count, m.pos.clone().add(new THREE.Vector3(0, 0.5, 0)));
+            this._remove(i);
+          }
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  _remove(i) {
+    this.scene.remove(this.mobs[i].group);
+    this.mobs.splice(i, 1);
   }
 }
 
@@ -2751,6 +3245,7 @@ class Player {
 
   die() {
     this.dead = true;
+    this.onDeath?.(this.position.clone());   // main.js: scatter inventory as drops
     // Simple respawn after a moment at the surface
     setTimeout(() => {
       const y = this.world.surfaceHeight(0, 0) + 2;
@@ -2945,6 +3440,11 @@ class Interaction {
     /** Optional hook: (blockId) => true if the block was "used" (e.g. opens
      *  a crafting table UI). Set by main.js. Crouching bypasses it. */
     this.onUseBlock = null;
+    /** Optional hook: (damage) => true if a mob was hit (set by main.js). */
+    this.onAttack = null;
+    /** Optional hook: (id, count, blockPos) — spawn a ground drop instead of
+     *  direct inventory pickup. Set by main.js. */
+    this.onBlockDrop = null;
 
     // ---- Selection wireframe ----
     const boxGeo = new THREE.BoxGeometry(1.002, 1.002, 1.002);
@@ -2980,7 +3480,13 @@ class Interaction {
   _bindInput() {
     document.addEventListener('mousedown', (e) => {
       if (!this.player.enabled) return;
-      if (e.button === 0) this.buttons.left = true;
+      if (e.button === 0) {
+        // A swing first checks for a mob — hitting one doesn't mine the
+        // block behind it
+        const dmg = attackDamage(this.inventory.selectedItem()?.id);
+        if (this.onAttack?.(dmg)) { this._resetBreaking(); return; }
+        this.buttons.left = true;
+      }
       if (e.button === 2) { this.buttons.right = true; this.tryPlace(); }
     });
     document.addEventListener('mouseup', (e) => {
@@ -3113,18 +3619,38 @@ class Interaction {
   breakBlock(pos, id) {
     this.world.setBlock(pos.x, pos.y, pos.z, BLOCK.AIR);
 
-    // Breaking a chest hands you its contents (no item entities yet)
+    const give = (itemId, count) => {
+      if (this.onBlockDrop) this.onBlockDrop(itemId, count, pos);
+      else this.inventory.add(itemId, count);
+    };
+
+    // Breaking a chest/furnace spills its contents
     if (id === BLOCK.CHEST) {
       const key = `${pos.x},${pos.y},${pos.z}`;
-      for (const s of this.world.removeChest(key)) this.inventory.add(s.id, s.count);
+      for (const s of this.world.removeChest(key)) give(s.id, s.count);
       this.onChestBroken?.(key);
     }
+    if (id === BLOCK.FURNACE) {
+      const key = `${pos.x},${pos.y},${pos.z}`;
+      for (const s of this.world.removeFurnace(key)) give(s.id, s.count);
+    }
 
-    this.inventory.add(blockDrop(id), 1);
+    // Creative mode breaks silently into nothing (like Minecraft)
+    if (!this.player.creative) give(blockDrop(id), 1);
     this.audio?.breakBlock(id);
   }
 
   tryPlace() {
+    // Eating works anywhere, even pointing at the sky
+    const held = this.inventory.selectedItem();
+    if (held && itemDef(held.id).food && this.player.hunger < 19.5) {
+      this.player.hunger = Math.min(20, this.player.hunger + itemDef(held.id).food);
+      this.inventory.consumeSelected();
+      this.audio?.play('eat');
+      this.placeCooldown = 0.45;
+      return;
+    }
+
     if (!this.target) return;
 
     // Interactive blocks (crafting table) open on right click unless crouching
@@ -3187,6 +3713,7 @@ const CRAFT_BASE = 100;   // craft grid cells are CRAFT_BASE + i (i in 0..8)
 const RESULT_INDEX = 200; // crafting result slot
 const CHEST_BASE = 400;   // open-chest slots are CHEST_BASE + i (i in 0..26)
 const CREATIVE_BASE = 600;// creative palette entries
+const FURNACE_BASE = 700; // furnace slots: 700 input, 701 fuel, 702 output
 
 class Inventory {
   constructor(atlas, audio) {
@@ -3206,6 +3733,8 @@ class Inventory {
     /** Open chest: reference to a 27-slot array (world/chest storage). */
     this.chest = null;
     this.onChestChange = null;   // callback after any chest slot changes
+    /** Open furnace: reference to {slots:[in,fuel,out], progress, burn}. */
+    this.furnace = null;
     this.creativeMode = false;
 
     this._iconCache = new Map();
@@ -3219,6 +3748,12 @@ class Inventory {
       craftBlock: document.getElementById('craft-block'),
       chestArea: document.getElementById('chest-area'),
       chestGrid: document.getElementById('chest-grid'),
+      furnaceArea: document.getElementById('furnace-area'),
+      furnaceIn: document.getElementById('furnace-in'),
+      furnaceFuel: document.getElementById('furnace-fuel'),
+      furnaceOut: document.getElementById('furnace-out'),
+      furnaceFlame: document.getElementById('furnace-flame'),
+      furnaceFill: document.getElementById('furnace-progress-fill'),
       creativeArea: document.getElementById('creative-area'),
       creativeGrid: document.getElementById('creative-grid'),
       drag: document.getElementById('drag-item'),
@@ -3289,6 +3824,9 @@ class Inventory {
     for (let i = 0; i < 9; i++) craftGrid.appendChild(this._makeSlot(CRAFT_BASE + i, true));
     craftResult.appendChild(this._makeSlot(RESULT_INDEX, true));
     for (let i = 0; i < 27; i++) this._els.chestGrid.appendChild(this._makeSlot(CHEST_BASE + i, true));
+    this._els.furnaceIn.appendChild(this._makeSlot(FURNACE_BASE, true));
+    this._els.furnaceFuel.appendChild(this._makeSlot(FURNACE_BASE + 1, true));
+    this._els.furnaceOut.appendChild(this._makeSlot(FURNACE_BASE + 2, true));
 
     // Creative palette: every real block + item, one slot each
     this._creativeIds = [
@@ -3344,11 +3882,31 @@ class Inventory {
       return;
     }
 
-    // Route to the right backing array (main slots / craft grid / open chest)
-    const isChest = index >= CHEST_BASE && index < CREATIVE_BASE;
-    const isCraft = !isChest && index >= CRAFT_BASE;
-    const arr = isChest ? this.chest : isCraft ? this.craft : this.slots;
-    const i = isChest ? index - CHEST_BASE : isCraft ? index - CRAFT_BASE : index;
+    // Furnace output: take-only (pick up or merge into held stack)
+    if (index === FURNACE_BASE + 2) {
+      if (!this.furnace) return;
+      const out = this.furnace.slots[2];
+      if (!out) return;
+      if (!this.dragging) { this.dragging = out; this.furnace.slots[2] = null; }
+      else if (this.dragging.id === out.id && this.dragging.count + out.count <= maxStack(out.id)) {
+        this.dragging.count += out.count;
+        this.furnace.slots[2] = null;
+      } else return;
+      this.audio?.play('click');
+      this.renderAll();
+      return;
+    }
+
+    // Route to the right backing array (slots / craft grid / chest / furnace)
+    const isFurnace = index >= FURNACE_BASE;
+    const isChest = !isFurnace && index >= CHEST_BASE && index < CREATIVE_BASE;
+    const isCraft = !isFurnace && !isChest && index >= CRAFT_BASE;
+    const arr = isFurnace ? this.furnace?.slots
+              : isChest ? this.chest
+              : isCraft ? this.craft : this.slots;
+    const i = isFurnace ? index - FURNACE_BASE
+            : isChest ? index - CHEST_BASE
+            : isCraft ? index - CRAFT_BASE : index;
     if (!arr) return;
     const slot = arr[i];
 
@@ -3471,8 +4029,9 @@ class Inventory {
       this._applyCraftSize();
       this._updateResult();
       this._els.chestArea.classList.toggle('hidden', !this.chest);
-      this._els.craftBlock.classList.toggle('hidden', !!this.chest);
-      this._els.creativeArea.classList.toggle('hidden', !this.creativeMode || !!this.chest);
+      this._els.furnaceArea.classList.toggle('hidden', !this.furnace);
+      this._els.craftBlock.classList.toggle('hidden', !!this.chest || !!this.furnace);
+      this._els.creativeArea.classList.toggle('hidden', !this.creativeMode || !!this.chest || !!this.furnace);
     } else {
       this._dumpCraftGrid();             // don't lose items left in the grid
       if (this.dragging) {               // drop held stack back into inventory
@@ -3481,6 +4040,7 @@ class Inventory {
       }
       this.chest = null;
       this.onChestChange = null;
+      this.furnace = null;
     }
     this.renderAll();
     return this.open;
@@ -3492,6 +4052,26 @@ class Inventory {
     this.onChestChange = onChange || null;
     this.open = false;       // force toggle() into the "opening" branch
     this.toggle();
+  }
+
+  /** Open the inventory with a furnace attached. */
+  openFurnace(furnaceState) {
+    this.furnace = furnaceState;
+    this.open = false;
+    this.toggle();
+  }
+
+  /** Live furnace display (called each frame by main while open). */
+  updateFurnaceView() {
+    if (!this.open || !this.furnace) return;
+    this._els.furnaceFlame.classList.toggle('lit', this.furnace.burn > 0);
+    this._els.furnaceFill.style.width = `${Math.min(100, (this.furnace.progress / 5) * 100)}%`;
+  }
+
+  /** Wipe everything (death). */
+  clearAll() {
+    this.slots.fill(null);
+    this.renderAll();
   }
 
   setCreative(on) { this.creativeMode = !!on; }
@@ -3569,6 +4149,11 @@ class Inventory {
     if (this.chest) {
       [...this._els.chestGrid.children].forEach((el, i) =>
         this._renderSlot(el, this.chest[i], false));
+    }
+    if (this.furnace) {
+      this._renderSlot(this._els.furnaceIn.firstChild, this.furnace.slots[0], false);
+      this._renderSlot(this._els.furnaceFuel.firstChild, this.furnace.slots[1], false);
+      this._renderSlot(this._els.furnaceOut.firstChild, this.furnace.slots[2], false);
     }
     if (this.creativeMode && !this._creativeRendered) {
       [...this._els.creativeGrid.children].forEach((el, i) =>
@@ -4567,6 +5152,12 @@ class AudioEngine {
       case 'hurt':   this._tone({ freq: 220, dur: 0.18, gain: 0.2, type: 'sawtooth', slide: -120 }); break;
       case 'click':  this._tone({ freq: 800, dur: 0.03, gain: 0.08 }); break;
       case 'splash': this._noise({ freq: 900, dur: 0.35, gain: 0.3, q: 2, drop: 600 }); break;
+      case 'pop':    this._tone({ freq: 500, dur: 0.07, gain: 0.15, type: 'sine', slide: 400 }); break;
+      case 'eat':
+        this._noise({ freq: 600, dur: 0.09, gain: 0.25, q: 2 });
+        setTimeout(() => this._noise({ freq: 500, dur: 0.09, gain: 0.22, q: 2 }), 130);
+        setTimeout(() => this._noise({ freq: 550, dur: 0.09, gain: 0.2, q: 2 }), 260);
+        break;
     }
   }
 
@@ -4632,6 +5223,7 @@ class SaveSystem {
         seed: this.world.seed,
         edits: this.mpMode ? {} : this.world.edits,
         chests: this.mpMode ? {} : this.world.chests,
+        furnaces: this.world.furnaces,
         time: this.sky.time,
         player: {
           pos: this.player.position.toArray(),
@@ -4666,6 +5258,7 @@ class SaveSystem {
       this.world.edits = data.edits || {};
       this.world.chests = data.chests || {};
     }
+    this.world.furnaces = data.furnaces || {};
     if (data.time !== undefined) this.sky.time = data.time;
     if (data.player) {
       this.player.position.fromArray(data.player.pos);
@@ -4697,6 +5290,8 @@ class SaveSystem {
  * multiplayer server browser → game. One game per page load: quitting to
  * title saves and reloads for a clean slate.
  */
+
+
 
 
 
@@ -4793,9 +5388,13 @@ async function startGame(opts) {
   const selfAvatar = new Avatar(menu.username, menu.skin);
   scene.add(selfAvatar.group);
 
+  // Ground item drops + wandering mobs
+  const drops = new Drops(scene, world, atlas, audio);
+  const mobs = new MobManager(scene, world, drops, audio);
+
   game = {
     world, sky, player, inventory, interaction, hud, commands, saveSystem,
-    selfAvatar, gameMode, isMP, meta,
+    selfAvatar, gameMode, isMP, meta, drops, mobs,
     session: null,
     avatars: new Map(),       // uid -> { avatar, target: {x,y,z,yaw,pitch} }
     openChestKey: null,
@@ -4838,9 +5437,25 @@ async function startGame(opts) {
       setMode('inventory');
       return true;
     }
+    if (blockId === BLOCK.FURNACE) {
+      const p = interaction.target.pos;
+      inventory.openFurnace(world.getFurnace(`${p.x},${p.y},${p.z}`));
+      setMode('inventory');
+      return true;
+    }
     return false;
   };
   interaction.onChestBroken = (key) => game.session?.setChest(key, null);
+
+  // Mined blocks drop to the ground instead of teleporting into the inventory
+  interaction.onBlockDrop = (id, count, blockPos) => {
+    drops.spawn(id, count, new THREE.Vector3(blockPos.x + 0.5, blockPos.y + 0.4, blockPos.z + 0.5));
+  };
+  // Melee swings hit mobs first
+  interaction.onAttack = (dmg) =>
+    mobs.attack(camera.position, player.getLookDirection(), CONFIG.REACH, dmg);
+  // Dying scatters everything you carried
+  player.onDeath = (pos) => drops.scatterAll(inventory, pos);
 
   // ---- Multiplayer session ----
   if (isMP) {
@@ -4971,6 +5586,9 @@ document.addEventListener('keydown', (e) => {
     game.inventory.toggle(true);
     setMode('playing');
   }
+  if (e.code === 'KeyQ' && uiMode === 'playing') {
+    game.drops.throwFromPlayer(game.player, game.inventory);
+  }
   if ((e.code === 'KeyT' || e.code === 'Slash') && uiMode === 'playing') {
     e.preventDefault();
     setMode('chat');
@@ -5023,6 +5641,12 @@ function frame() {
     world.update(player.position);
     sky.update(dt, player.position, world.renderDistance);
     saveSystem.update(dt);
+    game.drops.update(dt, player, game.inventory);
+    game.mobs.update(dt, player.position);
+    if (world.tickFurnaces(dt) && game.inventory.open && game.inventory.furnace) {
+      game.inventory.renderAll();
+    }
+    game.inventory.updateFurnaceView();
 
     if (player.inWater && !game.wasInWater) audio.play('splash');
     game.wasInWater = player.inWater;

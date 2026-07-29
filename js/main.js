@@ -23,6 +23,8 @@ import { Menu } from './ui/menu.js';
 import { Sky } from './environment/sky.js';
 import { AudioEngine } from './audio/audio.js';
 import { Net } from './net/net.js';
+import { Drops } from './entities/drops.js';
+import { MobManager } from './entities/mobs.js';
 
 // ---------------------------------------------------------------- Renderer
 const renderer = new THREE.WebGLRenderer({ antialias: false });
@@ -101,9 +103,13 @@ async function startGame(opts) {
   const selfAvatar = new Avatar(menu.username, menu.skin);
   scene.add(selfAvatar.group);
 
+  // Ground item drops + wandering mobs
+  const drops = new Drops(scene, world, atlas, audio);
+  const mobs = new MobManager(scene, world, drops, audio);
+
   game = {
     world, sky, player, inventory, interaction, hud, commands, saveSystem,
-    selfAvatar, gameMode, isMP, meta,
+    selfAvatar, gameMode, isMP, meta, drops, mobs,
     session: null,
     avatars: new Map(),       // uid -> { avatar, target: {x,y,z,yaw,pitch} }
     openChestKey: null,
@@ -146,9 +152,25 @@ async function startGame(opts) {
       setMode('inventory');
       return true;
     }
+    if (blockId === BLOCK.FURNACE) {
+      const p = interaction.target.pos;
+      inventory.openFurnace(world.getFurnace(`${p.x},${p.y},${p.z}`));
+      setMode('inventory');
+      return true;
+    }
     return false;
   };
   interaction.onChestBroken = (key) => game.session?.setChest(key, null);
+
+  // Mined blocks drop to the ground instead of teleporting into the inventory
+  interaction.onBlockDrop = (id, count, blockPos) => {
+    drops.spawn(id, count, new THREE.Vector3(blockPos.x + 0.5, blockPos.y + 0.4, blockPos.z + 0.5));
+  };
+  // Melee swings hit mobs first
+  interaction.onAttack = (dmg) =>
+    mobs.attack(camera.position, player.getLookDirection(), CONFIG.REACH, dmg);
+  // Dying scatters everything you carried
+  player.onDeath = (pos) => drops.scatterAll(inventory, pos);
 
   // ---- Multiplayer session ----
   if (isMP) {
@@ -279,6 +301,9 @@ document.addEventListener('keydown', (e) => {
     game.inventory.toggle(true);
     setMode('playing');
   }
+  if (e.code === 'KeyQ' && uiMode === 'playing') {
+    game.drops.throwFromPlayer(game.player, game.inventory);
+  }
   if ((e.code === 'KeyT' || e.code === 'Slash') && uiMode === 'playing') {
     e.preventDefault();
     setMode('chat');
@@ -331,6 +356,12 @@ function frame() {
     world.update(player.position);
     sky.update(dt, player.position, world.renderDistance);
     saveSystem.update(dt);
+    game.drops.update(dt, player, game.inventory);
+    game.mobs.update(dt, player.position);
+    if (world.tickFurnaces(dt) && game.inventory.open && game.inventory.furnace) {
+      game.inventory.renderAll();
+    }
+    game.inventory.updateFurnaceView();
 
     if (player.inWater && !game.wasInWater) audio.play('splash');
     game.wasInWater = player.inWater;

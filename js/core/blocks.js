@@ -107,6 +107,7 @@ export const ITEM_DEFS = {
 export const TOOL_TIERS = ['wooden', 'stone', 'iron', 'golden', 'diamond'];
 export const TOOL_TYPES = ['pickaxe', 'axe', 'shovel', 'sword', 'hoe'];
 const TOOL_SPEED = { wooden: 2, stone: 4, iron: 6, golden: 12, diamond: 8 };
+const SWORD_DMG = { wooden: 4, stone: 5, iron: 6, golden: 4, diamond: 7 };
 
 // Generate the 25 tool items (ids 300..324), e.g. ITEM.DIAMOND_PICKAXE
 {
@@ -119,10 +120,47 @@ const TOOL_SPEED = { wooden: 2, stone: 4, iron: 6, golden: 12, diamond: 8 };
         icon: `${tier}_${type}`,
         stack: 1,
         tool: { type, speed: TOOL_SPEED[tier] },
+        // Combat: swords hit hardest, axes almost as hard
+        attack: type === 'sword' ? SWORD_DMG[tier] : type === 'axe' ? SWORD_DMG[tier] - 1 : 1,
       };
       id++;
     }
   }
+}
+
+// ---- Food (dropped by mobs; cook in a furnace, right-click to eat) ----
+ITEM.RAW_PORKCHOP = 270;
+ITEM.COOKED_PORKCHOP = 271;
+ITEM.RAW_BEEF = 272;
+ITEM.STEAK = 273;
+ITEM_DEFS[ITEM.RAW_PORKCHOP]    = { name: 'Raw Porkchop',    icon: 'raw_porkchop',    food: 3 };
+ITEM_DEFS[ITEM.COOKED_PORKCHOP] = { name: 'Cooked Porkchop', icon: 'cooked_porkchop', food: 8 };
+ITEM_DEFS[ITEM.RAW_BEEF]        = { name: 'Raw Beef',        icon: 'raw_beef',        food: 3 };
+ITEM_DEFS[ITEM.STEAK]           = { name: 'Steak',           icon: 'steak',           food: 8 };
+
+/** Furnace: what smelts into what. */
+export const SMELT = {
+  [ITEM.RAW_PORKCHOP]: ITEM.COOKED_PORKCHOP,
+  [ITEM.RAW_BEEF]: ITEM.STEAK,
+  [BLOCK.LOG]: ITEM.COAL,          // charcoal
+};
+
+/** Furnace fuels → burn time in seconds (one smelt takes 5 s). */
+export const FUEL_SECONDS = {
+  [ITEM.COAL]: 40,
+  [BLOCK.COAL_BLOCK]: 400,
+  [BLOCK.LOG]: 15,
+  [BLOCK.PLANKS]: 7.5,
+  [ITEM.STICK]: 2.5,
+  [BLOCK.CRAFTING_TABLE]: 15,
+  [BLOCK.CHEST]: 15,
+  [ITEM.WOODEN_PICKAXE]: 10, [ITEM.WOODEN_AXE]: 10, [ITEM.WOODEN_SHOVEL]: 10,
+  [ITEM.WOODEN_SWORD]: 10, [ITEM.WOODEN_HOE]: 10,
+};
+
+/** Melee damage for the held item id (fist = 1). */
+export function attackDamage(id) {
+  return (id && ITEM_DEFS[id]?.attack) || 1;
 }
 
 // Ore drops: mining an ore yields its refined material directly
