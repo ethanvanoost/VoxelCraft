@@ -164,9 +164,40 @@ export class Inventory {
         e.preventDefault();
         this._slotClick(index, e.button === 2);
       });
+      // Drag crafting: hold right-click with a stack on the cursor and sweep
+      // across slots — one item is dealt into each slot you pass over.
+      el.addEventListener('mouseenter', () => {
+        if (this.open && this.dragging && this._heldButton === 2) {
+          this._dragPlaceOne(index);
+        }
+      });
       el.addEventListener('contextmenu', (e) => e.preventDefault());
     }
     return el;
+  }
+
+  /** Deposit exactly one item into a slot during a right-button drag. */
+  _dragPlaceOne(index) {
+    if (index === RESULT_INDEX || index >= CREATIVE_BASE || index === FURNACE_BASE + 2) return;
+    const isFurnace = index >= FURNACE_BASE;
+    const isChest = !isFurnace && index >= CHEST_BASE;
+    const isCraft = !isFurnace && !isChest && index >= CRAFT_BASE;
+    const arr = isFurnace ? this.furnace?.slots
+              : isChest ? this.chest
+              : isCraft ? this.craft : this.slots;
+    const i = isFurnace ? index - FURNACE_BASE
+            : isChest ? index - CHEST_BASE
+            : isCraft ? index - CRAFT_BASE : index;
+    if (!arr) return;
+    const slot = arr[i];
+    if (!slot) arr[i] = { id: this.dragging.id, count: 1 };
+    else if (slot.id === this.dragging.id && slot.count < maxStack(slot.id)) slot.count++;
+    else return;   // incompatible slot: skip it, keep dragging
+    if (--this.dragging.count <= 0) this.dragging = null;
+    if (isCraft) this._updateResult();
+    if (isChest) this.onChestChange?.();
+    this.audio?.play('click');
+    this.renderAll();
   }
 
   /** Click while inventory open: pick up / put down / split / merge stacks. */
@@ -313,6 +344,11 @@ export class Inventory {
         if (n >= 1 && n <= 9) this.select(n - 1);
       }
     });
+    // Track held mouse button for drag crafting
+    this._heldButton = null;
+    document.addEventListener('mousedown', (e) => { this._heldButton = e.button; });
+    document.addEventListener('mouseup', () => { this._heldButton = null; });
+
     // Drag item follows the cursor
     document.addEventListener('mousemove', (e) => {
       if (this.dragging) {

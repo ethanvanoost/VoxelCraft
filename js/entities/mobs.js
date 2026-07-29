@@ -126,7 +126,8 @@ class Mob {
   hurt(dmg, knockDir) {
     this.health -= dmg;
     this.hurtTimer = 0.35;
-    this.vel.add(knockDir.clone().setY(0).normalize().multiplyScalar(6)).y = 4.5;
+    // gentle shove, not a launch
+    this.vel.add(knockDir.clone().setY(0).normalize().multiplyScalar(2.2)).y = 2.8;
     return this.health <= 0;
   }
 }
